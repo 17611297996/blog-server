@@ -1,0 +1,136 @@
+{
+  "categories": [
+    {
+      "id": 1,
+      "name": "前端开发",
+      "slug": "frontend",
+      "description": "前端开发相关技术文章",
+      "hasSubMenu": true,
+      "subCategories": [
+        {
+          "id": 11,
+          "name": "Vue",
+          "slug": "vue",
+          "description": "Vue.js框架相关文章",
+          "parentId": 1
+        },
+        {
+          "id": 12,
+          "name": "React",
+          "slug": "react",
+          "description": "React框架相关文章",
+          "parentId": 1
+        },
+        {
+          "id": 13,
+          "name": "JavaScript",
+          "slug": "javascript",
+          "description": "JavaScript语言相关文章",
+          "parentId": 1
+        },
+        {
+          "id": 14,
+          "name": "TypeScript",
+          "slug": "typescript",
+          "description": "TypeScript语言相关文章",
+          "parentId": 1
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "后端开发",
+      "slug": "backend",
+      "description": "后端开发相关技术文章",
+      "hasSubMenu": true,
+      "subCategories": [
+        {
+          "id": 21,
+          "name": "Node.js",
+          "slug": "nodejs",
+          "description": "Node.js相关文章",
+          "parentId": 2
+        },
+        {
+          "id": 22,
+          "name": "Python",
+          "slug": "python",
+          "description": "Python语言相关文章",
+          "parentId": 2
+        },
+        {
+          "id": 23,
+          "name": "Java",
+          "slug": "java",
+          "description": "Java语言相关文章",
+          "parentId": 2
+        },
+        {
+          "id": 24,
+          "name": "Go",
+          "slug": "go",
+          "description": "Go语言相关文章",
+          "parentId": 2
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "服务器",
+      "slug": "server",
+      "description": "服务器相关技术文章",
+      "hasSubMenu": true,
+      "subCategories": [
+        {
+          "id": 31,
+          "name": "部署运维",
+          "slug": "devops",
+          "description": "部署运维相关文章",
+          "parentId": 3
+        },
+        {
+          "id": 32,
+          "name": "云服务",
+          "slug": "cloud",
+          "description": "云服务相关文章",
+          "parentId": 3
+        },
+        {
+          "id": 33,
+          "name": "Docker",
+          "slug": "docker",
+          "description": "Docker容器化相关文章",
+          "parentId": 3
+        },
+        {
+          "id": 34,
+          "name": "Nginx",
+          "slug": "nginx",
+          "description": "Nginx服务器相关文章",
+          "parentId": 3
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "性能监控",
+      "slug": "performance",
+      "description": "性能监控相关技术文章",
+      "hasSubMenu": false,
+      "subCategories": []
+    },
+    {
+      "id": 5,
+      "name": "微信相关",
+      "slug": "wechat",
+      "description": "微信开发相关技术文章",
+      "hasSubMenu": false,
+      "subCategories": []
+    }
+  ],
+  "metadata": {
+    "totalCategories": 5,
+    "lastUpdated": "2024-01-20T10:00:00Z",
+    "version": "1.0.0"
+  }
+}

@@ -1,0 +1,116 @@
+{
+  "articles": [
+    {
+      "id": 3229293222,
+      "title": "React Hooks 完全指南",
+      "slug": "react-hooks-guide",
+      "excerpt": "React Hooks 是 React 16.8 引入的新特性，它允许你在不编写 class 的情况下使用 state 以及其他的 React 特性。本文将详细介绍 React Hooks 的使用方法和最佳实践。...",
+      "content": "content/articles/frontend/react-hooks-guide.md",
+      "categoryId": 1,
+      "categorySlug": "frontend",
+      "categorySlugs": [
+        "frontend",
+        "react"
+      ],
+      "tags": [
+        "React",
+        "Hooks",
+        "前端开发"
+      ],
+      "author": "admin",
+      "publishDate": "2024-01-20T00:00:00.000Z",
+      "updateDate": "2025-07-21T14:30:02.633Z",
+      "status": "published",
+      "views": 0,
+      "likes": 0,
+      "comments": 0,
+      "featured": false,
+      "coverImage": "content/assets/images/react-hooks-guide-cover.jpg"
+    },
+    {
+      "id": 453305820,
+      "title": "React Hooks 完全指南",
+      "slug": "-cicd",
+      "excerpt": "每次部署项目时，手动将文件拷贝到服务器不仅繁琐，还容易出错。因此，我决定学习如何进行前端全自动部署。我的目标是让部署过程更加便捷高效，只需提交代码，服务器就能自动更新，这样可以大大节省时间，提高工作效率。...",
+      "content": "content/articles/server/前端也要必备的全自动化部署cicd.md",
+      "categoryId": 3,
+      "categorySlug": "server",
+      "categorySlugs": [
+        "frontend",
+        "react"
+      ],
+      "tags": [],
+      "author": "admin",
+      "publishDate": "2024-01-20T00:00:00.000Z",
+      "updateDate": "2025-07-21T14:30:02.636Z",
+      "status": "published",
+      "views": 0,
+      "likes": 0,
+      "comments": 0,
+      "featured": false,
+      "coverImage": "content/assets/images/前端也要必备的全自动化部署cicd-cover.jpg"
+    },
+    {
+      "id": 967244257,
+      "title": "Vue3 组合式 API 深度解析",
+      "slug": "vue3-composition-api",
+      "excerpt": "Vue3 的组合式 API（Composition API）是 Vue.js 框架的一次重大革新，它为开发者提供了更灵活、更强大的代码组织方式。本文将深入探讨组合式 API 的核心概念和实际应用。...",
+      "content": "content/articles/frontend/vue3-composition-api.md",
+      "categoryId": 1,
+      "categorySlug": "frontend",
+      "categorySlugs": [
+        "frontend",
+        "vue"
+      ],
+      "tags": [
+        "Vue3",
+        "Composition API",
+        "JavaScript"
+      ],
+      "author": "admin",
+      "publishDate": "2024-01-15T00:00:00.000Z",
+      "updateDate": "2025-07-21T14:30:02.635Z",
+      "status": "published",
+      "views": 0,
+      "likes": 0,
+      "comments": 0,
+      "featured": false,
+      "coverImage": "content/assets/images/vue3-composition-api-cover.jpg"
+    },
+    {
+      "id": 2238124451,
+      "title": "Node.js 性能优化实战",
+      "slug": "nodejs-performance",
+      "excerpt": "Node.js 作为高性能的服务器端 JavaScript 运行时，在正确使用的情况下能够提供出色的性能。但是，如果不注意一些关键的优化点，应用的性能可能会大打折扣。本文将分享一些实用的 Node.js 性能优化技巧。...",
+      "content": "content/articles/backend/nodejs-performance.md",
+      "categoryId": 2,
+      "categorySlug": "backend",
+      "categorySlugs": [
+        "backend",
+        "nodejs"
+      ],
+      "tags": [
+        "Node.js",
+        "性能优化",
+        "后端开发"
+      ],
+      "author": "admin",
+      "publishDate": "2024-01-08T00:00:00.000Z",
+      "updateDate": "2025-07-21T14:30:02.631Z",
+      "status": "published",
+      "views": 0,
+      "likes": 0,
+      "comments": 0,
+      "featured": false,
+      "coverImage": "content/assets/images/nodejs-performance-cover.jpg"
+    }
+  ],
+  "metadata": {
+    "totalArticles": 4,
+    "publishedArticles": 4,
+    "draftArticles": 0,
+    "lastUpdated": "2025-07-21T14:30:02.637Z",
+    "version": "1.0.0",
+    "generatedBy": "generate-article-index.js"
+  }
+}

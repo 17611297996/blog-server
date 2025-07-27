@@ -1,0 +1,90 @@
+{
+  "tags": [
+    {
+      "id": 1,
+      "name": "Vue3",
+      "slug": "vue3",
+      "description": "Vue.js 3.x 版本相关内容",
+      "color": "#4FC08D",
+      "count": 5
+    },
+    {
+      "id": 2,
+      "name": "React",
+      "slug": "react",
+      "description": "React 框架相关内容",
+      "color": "#61DAFB",
+      "count": 3
+    },
+    {
+      "id": 3,
+      "name": "TypeScript",
+      "slug": "typescript",
+      "description": "TypeScript 语言相关内容",
+      "color": "#3178C6",
+      "count": 4
+    },
+    {
+      "id": 4,
+      "name": "Node.js",
+      "slug": "nodejs",
+      "description": "Node.js 后端开发相关内容",
+      "color": "#339933",
+      "count": 6
+    },
+    {
+      "id": 5,
+      "name": "Docker",
+      "slug": "docker",
+      "description": "Docker 容器化相关内容",
+      "color": "#0db7ed",
+      "count": 2
+    },
+    {
+      "id": 6,
+      "name": "微信小程序",
+      "slug": "wechat-miniprogram",
+      "description": "微信小程序开发相关内容",
+      "color": "#07c160",
+      "count": 3
+    },
+    {
+      "id": 7,
+      "name": "性能优化",
+      "slug": "performance",
+      "description": "前端和后端性能优化相关内容",
+      "color": "#FF6B35",
+      "count": 4
+    },
+    {
+      "id": 8,
+      "name": "DevOps",
+      "slug": "devops",
+      "description": "运维和部署相关内容",
+      "color": "#326CE5",
+      "count": 2
+    },
+    {
+      "id": 9,
+      "name": "JavaScript",
+      "slug": "javascript",
+      "description": "JavaScript 语言相关内容",
+      "color": "#F7DF1E",
+      "count": 8
+    },
+    {
+      "id": 10,
+      "name": "前端开发",
+      "slug": "frontend",
+      "description": "前端开发相关内容",
+      "color": "#E44D26",
+      "count": 12
+    }
+  ],
+  "metadata": {
+    "totalTags": 10,
+    "mostUsedTag": "前端开发",
+    "lastUpdated": "2024-01-15T10:00:00Z",
+    "version": "1.0.0"
+  }
+} 
