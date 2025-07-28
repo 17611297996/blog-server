@@ -225,6 +225,17 @@ async function processArticle(filePath, existingArticles = {}) {
             return null;
         }
 
+        // 自动移除Markdown内容中的一级标题
+        const lines = content.split('\n');
+        if (lines.length > 0 && lines[0].startsWith('# ')) {
+            lines.shift(); // 移除标题行
+            // 如果标题行下面是空行，也一并移除
+            if (lines.length > 0 && lines[0].trim() === '') {
+                lines.shift();
+            }
+        }
+        const processedContent = lines.join('\n');
+
         // 生成文章 ID（基于文件路径的哈希）
         const relativePath = path.relative(CONFIG.articlesDir, filePath);
         const id = parseInt(crypto.createHash('md5').update(relativePath).digest('hex').substring(0, 8), 16);
@@ -234,8 +245,8 @@ async function processArticle(filePath, existingArticles = {}) {
             title: meta.title,
             slug: generateSlug(meta.title, filePath),
             excerpt: meta.excerpt,
-            // 修正 content 字段为相对项目根目录的路径
-            content: path.relative(process.cwd(), filePath).replace(/\\/g, '/'),
+            // 修正 content 字段为【处理后的内容】，而不是路径
+            content: processedContent,
             categoryId: category ? category.id : 0,
             categorySlug: category ? Object.keys(CATEGORY_MAP).find(key => CATEGORY_MAP[key].id === category.id) : '',
             categorySlugs, // 新增字段

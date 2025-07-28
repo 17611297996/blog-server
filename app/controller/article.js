@@ -74,58 +74,6 @@ class ArticleController extends Controller {
                 return;
             }
 
-            // 检查查询参数
-            const {
-                includeContent = 'auto',  // auto, true, false
-                checkBase64 = 'true',
-                maxSize = '500'
-            } = ctx.query;
-
-            // 智能内容加载选项
-            const contentOptions = {
-                includeContent: includeContent === 'auto' ? true : includeContent === 'true',
-                checkBase64: checkBase64 === 'true',
-                maxSize: parseInt(maxSize)
-            };
-
-            // 如果是auto模式，先检查内容信息
-            let content = '';
-            let contentWarning = null;
-
-            if (includeContent === 'auto') {
-                const contentInfo = await ctx.service.article.getArticleContentInfo(article.content);
-
-                if (contentInfo) {
-                    // 如果文件过大或包含base64图片，给出警告但仍返回基本信息
-                    const fileSizeKB = parseFloat(contentInfo.fileSizeKB);
-
-                    if (fileSizeKB > contentOptions.maxSize) {
-                        contentWarning = {
-                            type: 'large_file',
-                            message: `文章内容较大 (${contentInfo.fileSizeKB}KB)，建议使用 /api/articles/${article.id}/content 接口获取`,
-                            fileSize: contentInfo.fileSizeKB,
-                            recommendedApi: `/api/articles/${article.id}/content`
-                        };
-                        content = `# ${article.title}\n\n> 内容过大，请使用专门接口获取完整内容`;
-                    } else if (contentInfo.hasBase64Images && contentInfo.base64ImageCount > 0) {
-                        contentWarning = {
-                            type: 'base64_images',
-                            message: `文章包含 ${contentInfo.base64ImageCount} 个base64图片，建议先提取图片或使用原始内容接口`,
-                            base64ImageCount: contentInfo.base64ImageCount,
-                            estimatedSize: `${(contentInfo.estimatedBase64Size / 1024).toFixed(2)}KB`,
-                            recommendedAction: '运行 npm run extract:images 提取图片'
-                        };
-                        content = await ctx.service.article.getArticleContent(article.content, contentOptions);
-                    } else {
-                        content = await ctx.service.article.getArticleContent(article.content, contentOptions);
-                    }
-                } else {
-                    content = await ctx.service.article.getArticleContent(article.content, contentOptions);
-                }
-            } else {
-                content = await ctx.service.article.getArticleContent(article.content, contentOptions);
-            }
-
             // 获取作者信息
             const author = await ctx.service.user.getAuthorInfo(article.author);
 
@@ -134,15 +82,9 @@ class ArticleController extends Controller {
 
             const responseData = {
                 ...article,
-                content,
                 author,
                 category
             };
-
-            // 如果有内容警告，添加到响应中
-            if (contentWarning) {
-                responseData.contentWarning = contentWarning;
-            }
 
             ctx.body = {
                 success: true,
@@ -182,58 +124,6 @@ class ArticleController extends Controller {
                 return;
             }
 
-            // 检查查询参数
-            const {
-                includeContent = 'auto',  // auto, true, false
-                checkBase64 = 'true',
-                maxSize = '500'
-            } = ctx.query;
-
-            // 智能内容加载选项
-            const contentOptions = {
-                includeContent: includeContent === 'auto' ? true : includeContent === 'true',
-                checkBase64: checkBase64 === 'true',
-                maxSize: parseInt(maxSize)
-            };
-
-            // 如果是auto模式，先检查内容信息
-            let content = '';
-            let contentWarning = null;
-
-            if (includeContent === 'auto') {
-                const contentInfo = await ctx.service.article.getArticleContentInfo(article.content);
-
-                if (contentInfo) {
-                    // 如果文件过大或包含base64图片，给出警告但仍返回基本信息
-                    const fileSizeKB = parseFloat(contentInfo.fileSizeKB);
-
-                    if (fileSizeKB > contentOptions.maxSize) {
-                        contentWarning = {
-                            type: 'large_file',
-                            message: `文章内容较大 (${contentInfo.fileSizeKB}KB)，建议使用 /api/articles/${article.id}/content 接口获取`,
-                            fileSize: contentInfo.fileSizeKB,
-                            recommendedApi: `/api/articles/${article.id}/content`
-                        };
-                        content = `# ${article.title}\n\n> 内容过大，请使用专门接口获取完整内容`;
-                    } else if (contentInfo.hasBase64Images && contentInfo.base64ImageCount > 0) {
-                        contentWarning = {
-                            type: 'base64_images',
-                            message: `文章包含 ${contentInfo.base64ImageCount} 个base64图片，建议先提取图片或使用原始内容接口`,
-                            base64ImageCount: contentInfo.base64ImageCount,
-                            estimatedSize: `${(contentInfo.estimatedBase64Size / 1024).toFixed(2)}KB`,
-                            recommendedAction: '运行 npm run extract:images 提取图片'
-                        };
-                        content = await ctx.service.article.getArticleContent(article.content, contentOptions);
-                    } else {
-                        content = await ctx.service.article.getArticleContent(article.content, contentOptions);
-                    }
-                } else {
-                    content = await ctx.service.article.getArticleContent(article.content, contentOptions);
-                }
-            } else {
-                content = await ctx.service.article.getArticleContent(article.content, contentOptions);
-            }
-
             // 获取作者信息
             const author = await ctx.service.user.getAuthorInfo(article.author);
 
@@ -242,15 +132,9 @@ class ArticleController extends Controller {
 
             const responseData = {
                 ...article,
-                content,
                 author,
                 category
             };
-
-            // 如果有内容警告，添加到响应中
-            if (contentWarning) {
-                responseData.contentWarning = contentWarning;
-            }
 
             ctx.body = {
                 success: true,
