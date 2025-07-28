@@ -132,7 +132,7 @@ class ArticleService extends Service {
                 return '内容过大，请使用专门的内容接口获取';
             }
 
-            const content = await fs.readFile(fullPath, 'utf-8');
+            let content = await fs.readFile(fullPath, 'utf-8');
 
             // 检查是否包含base64图片
             if (checkBase64 && content.includes('data:image/')) {
@@ -142,6 +142,17 @@ class ArticleService extends Service {
                     return '文章包含base64图片，请先运行图片提取脚本或使用原始内容接口';
                 }
             }
+            // 自动移除Markdown内容中的一级标题
+            const lines = content.split('\n');
+            if (lines.length > 0 && lines[0].startsWith('# ')) {
+                lines.shift(); // 移除标题行
+                // 如果标题行下面是空行，也一并移除
+                if (lines.length > 0 && lines[0].trim() === '') {
+                    lines.shift();
+                }
+                content = lines.join('\n');
+            }
+
 
             return content;
         } catch (error) {
