@@ -25,8 +25,9 @@ module.exports = appInfo => {
 
   // CORS配置，允许前端跨域访问
   config.cors = {
-    origin: '*', // 开发环境允许所有来源
+    origin: '*', // 允许来自http://localhost:3000的跨域请求
     allowMethods: 'GET,HEAD,PUT,POST,DELETE,PATCH',
+    credentials: true, // 允许携带cookie
   };
 
   // 静态文件服务配置
