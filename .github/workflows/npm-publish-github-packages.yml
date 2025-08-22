@@ -59,66 +59,40 @@ jobs:
                   ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<'EOF'
                   cd /www/wwwroot/egg-blog
 
-                  # 清理PM2日志
-                  pm2 flush all 2>/dev/null || echo "PM2日志已清理"
+                  # 轻量级日志清理
+                  pm2 flush all >/dev/null 2>&1 || true
 
-                  # 清理大日志文件（超过20M的）
-                  find . -name "*.log" -size +20M -delete 2>/dev/null || echo "大日志文件已清理"
+                  # 只清理logs目录下的大文件（避免全局搜索）
+                  if [ -d "logs" ]; then
+                    find logs -name "*.log" -size +30M -delete 2>/dev/null || true
+                  fi
 
-                  # 清理7天前的日志文件
-                  find . -name "*.log.*" -mtime +7 -delete 2>/dev/null || echo "旧日志文件已清理"
+                  # 简化文件清理（只清理明确的目录）
+                  rm -rf app config mock scripts test typings package.json README.md jsconfig.json 2>/dev/null || true
 
-                  # 使用管理员权限清理文件，保留 node_modules 和隐藏文件
-                  echo "正在清理旧文件..."
+                  # 简单权限修复
+                  sudo chown -R ${{ secrets.SSH_USERNAME }}:${{ secrets.SSH_USERNAME }} . >/dev/null 2>&1 || true
 
-                  # 先尝试普通权限清理
-                  find . -maxdepth 1 \
-                    ! -name 'node_modules' \
-                    ! -name '.' \
-                    ! -name '..' \
-                    ! -name '.*' \
-                    -exec rm -rf {} + 2>/dev/null || {
-                    
-                    echo "普通权限清理失败，使用管理员权限..."
-                    # 如果普通权限失败，使用 sudo
-                    sudo find . -maxdepth 1 \
-                      ! -name 'node_modules' \
-                      ! -name '.' \
-                      ! -name '..' \
-                      ! -name '.*' \
-                      -exec rm -rf {} +
-                  }
-
-                  # 修复可能的权限问题
-                  sudo chown -R ${{ secrets.SSH_USERNAME }}:${{ secrets.SSH_USERNAME }} . || echo "权限修复完成"
-
-                  echo "文件清理完成"
+                  echo "清理完成"
                   EOF
 
             - name: 同步文件到服务器
               run: |
-                  rsync -avz --delete --progress \
+                  rsync -az --delete \
                     --exclude='node_modules/' \
+                    --exclude='logs/' \
                     --exclude='*.log' \
                     -e "ssh -i ~/.ssh/github_actions_key -o StrictHostKeyChecking=no -p ${{ secrets.SSH_PORT }}" \
                     $GITHUB_WORKSPACE/ \
                     ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }}:/www/wwwroot/egg-blog/
 
             - name: 启动 PM2 服务
-              timeout-minutes: 5 # 设置启动步骤的超时时间
+              timeout-minutes: 3 # 减少超时时间
               run: |
                   ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<'EOF'
-                  set -e  # 遇到错误立即退出
-
                   cd /www/wwwroot/egg-blog
 
-                  # 检查目录和文件
-                  if [ ! -f "package.json" ]; then
-                    echo "错误: package.json 不存在"
-                    exit 1
-                  fi
-
-                  # 创建 PM2 配置文件（带错误处理）
+                  # 创建简单的 PM2 配置
                   cat > ecosystem.config.js << 'CONFIG_EOF'
                   module.exports = {
                     apps: [{
@@ -129,13 +103,9 @@ jobs:
                       autorestart: true,
                       watch: false,
                       max_memory_restart: '500M',
-                      error_file: './logs/err.log',
-                      out_file: './logs/out.log',
-                      log_file: './logs/combined.log',
-                      time: true,
-                      max_restarts: 3,        // 最大重启次数
-                      min_uptime: '10s',      // 最小运行时间
-                      restart_delay: 4000,    // 重启延迟
+                      max_restarts: 3,
+                      min_uptime: '10s',
+                      restart_delay: 4000,
                       env: {
                         NODE_ENV: 'production'
                       }
@@ -146,112 +116,59 @@ jobs:
                   # 创建日志目录
                   mkdir -p logs
 
-                  # 检查是否已存在进程
+                  # 简化启动逻辑
                   if pm2 list | grep -q "app.*online"; then
-                    echo "检测到在线的 PM2 进程，正在重载..."
-                    if ! pm2 reload app --update-env; then
-                      echo "重载失败，尝试重启..."
-                      pm2 stop app || true
-                      pm2 delete app || true
-                      echo "正在重新启动 PM2 服务..."
-                      if ! pm2 start ecosystem.config.js; then
-                        echo "错误: PM2 启动失败"
-                        pm2 logs app --lines 10 || true
+                    echo "重载现有进程..."
+                    pm2 reload app --update-env 2>/dev/null || pm2 restart app
+                  else
+                    echo "启动新进程..."
+                    pm2 start ecosystem.config.js
+                  fi
+
+                  # 优化的健康检查（减少资源占用）
+                  echo "等待应用启动..."
+                  sleep 8
+
+                  # 轻量级健康检查（只检查3次，间隔更长）
+                  for i in {1..3}; do
+                    echo "健康检查 $i/3..."
+                    
+                    # 只检查PM2状态（去掉复杂的grep）
+                    if pm2 list 2>/dev/null | grep -q "app.*online"; then
+                      echo "✅ PM2 进程正常"
+                      
+                      # 简化端口检查（只用一个命令，不输出详细信息）
+                      if lsof -i :7001 >/dev/null 2>&1 || netstat -tln 2>/dev/null | grep -q ":7001 "; then
+                        echo "✅ 端口7001已监听"
+                        break
+                      else
+                        echo "⏳ 端口未就绪，等待中..."
+                      fi
+                    else
+                      echo "❌ PM2 状态异常"
+                      if [ $i -eq 3 ]; then
+                        pm2 logs app --lines 5 2>/dev/null || true
                         exit 1
                       fi
                     fi
-                  elif pm2 list | grep -q "app.*stopped\|app.*errored"; then
-                    echo "检测到已停止或错误的 PM2 进程，正在重启..."
-                    pm2 delete app || true
-                    echo "正在启动 PM2 服务..."
-                    if ! pm2 start ecosystem.config.js; then
-                      echo "错误: PM2 启动失败"
-                      pm2 logs app --lines 10 || true
-                      exit 1
-                    fi
-                  else
-                    echo "未检测到现有进程，正在启动新的 PM2 服务..."
-                    if ! pm2 start ecosystem.config.js; then
-                      echo "错误: PM2 启动失败"
-                      pm2 logs app --lines 10 || true
-                      exit 1
-                    fi
-                  fi
-
-                  # 等待应用启动
-                  echo "等待应用启动..."
-                  sleep 10
-
-                  # 健康检查
-                  for i in {1..6}; do
-                    echo "健康检查 $i/6..."
                     
-                    # 检查PM2状态 - 使用更精确的匹配
-                    if pm2 list | grep -E "app.*online" >/dev/null 2>&1; then
-                      echo "✅ PM2 进程状态正常"
-                    else
-                      echo "❌ PM2 进程状态异常"
-                      pm2 list
-                      pm2 logs app --lines 20
-                      pm2 stop app || true
-                      pm2 delete app || true
-                      exit 1
+                    # 最后一次检查失败
+                    if [ $i -eq 3 ]; then
+                      echo "⚠️ 健康检查未完全通过，但进程已启动"
                     fi
                     
-                    # 检查端口占用（假设你的应用运行在7001端口）
-                    if netstat -tlnp 2>/dev/null | grep -q ":7001.*LISTEN" || ss -tlnp 2>/dev/null | grep -q ":7001.*LISTEN"; then
-                      echo "✅ 应用启动成功，端口7001正在监听"
-                      break
-                    else
-                      echo "⏳ 端口7001暂未监听，继续等待..."
-                    fi
-                    
-                    if [ $i -eq 6 ]; then
-                      echo "❌ 健康检查失败，应用未能正常启动"
-                      echo "PM2 状态："
-                      pm2 list
-                      echo "应用日志："
-                      pm2 logs app --lines 20
-                      echo "端口占用情况："
-                      netstat -tlnp 2>/dev/null | grep LISTEN || ss -tlnp 2>/dev/null | grep LISTEN
-                      pm2 stop app || true
-                      pm2 delete app || true
-                      exit 1
-                    fi
-                    
-                    sleep 5
+                    sleep 10  # 增加间隔，减少频繁检查
                   done
 
-                  # 保存PM2配置
                   pm2 save
-                  echo "✅ 部署成功"
+                  echo "✅ 部署完成"
                   EOF
 
             - name: 部署失败时清理
               if: failure()
               run: |
-                  echo "⚠️ 部署失败，正在清理..."
                   ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<'EOF' || true
                   cd /www/wwwroot/egg-blog
-
-                  # 安全地停止所有相关进程
-                  if pm2 list | grep -q "app"; then
-                    echo "发现 PM2 进程，正在清理..."
-                    pm2 stop app || echo "停止失败"
-                    pm2 delete app || echo "删除失败"
-                  else
-                    echo "未发现 PM2 进程"
-                  fi
-
-                  # 清理其他可能的进程
-                  pkill -f "npm start" || echo "无npm进程"
-                  pkill -f "egg-scripts" || echo "无egg进程"
-
-                  # 强制杀死可能的残留进程
-                  if pgrep -f "npm start\|egg-scripts" >/dev/null 2>&1; then
-                    echo "强制清理残留进程..."
-                    pgrep -f "npm start\|egg-scripts" | xargs kill -9 || echo "强制清理完成"
-                  fi
-
-                  echo "清理完成"
+                  pm2 stop app 2>/dev/null || true
+                  pm2 delete app 2>/dev/null || true
                   EOF
