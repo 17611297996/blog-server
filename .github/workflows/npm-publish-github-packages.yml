@@ -29,19 +29,28 @@ jobs:
                   ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<'EOF'
                   cd /www/wwwroot/egg-blog
 
-                  # 强制停止所有相关进程
-                  pm2 stop app || echo "无需停止"
-                  pm2 delete app || echo "无需删除"
-                  pkill -f "npm start" || echo "无残留进程"
-                  pkill -f "egg-scripts" || echo "无egg进程"
+                  # 检查进程是否存在并安全停止
+                  if pm2 list | grep -q "app"; then
+                    echo "发现 PM2 进程，正在停止..."
+                    pm2 stop app || echo "停止进程失败或进程已停止"
+                    pm2 delete app || echo "删除进程失败或进程不存在" 
+                  else
+                    echo "未发现 PM2 进程 'app'"
+                  fi
+
+                  # 强制清理可能的残留进程
+                  pkill -f "npm start" || echo "无残留npm进程"
+                  pkill -f "egg-scripts" || echo "无残留egg进程"
 
                   # 等待进程完全退出
                   sleep 2
 
-                  # 验证进程已停止
-                  if pgrep -f "npm start\|egg-scripts"; then
-                    echo "警告: 仍有相关进程运行"
-                    pgrep -f "npm start\|egg-scripts" | xargs kill -9 || true
+                  # 验证进程已停止（使用更安全的检查）
+                  if pgrep -f "npm start\|egg-scripts" >/dev/null 2>&1; then
+                    echo "警告: 仍有相关进程运行，强制终止..."
+                    pgrep -f "npm start\|egg-scripts" | xargs kill -9 || echo "强制终止完成"
+                  else
+                    echo "所有相关进程已清理完毕"
                   fi
                   EOF
 
@@ -186,14 +195,24 @@ jobs:
                   ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<'EOF' || true
                   cd /www/wwwroot/egg-blog
 
-                  # 停止所有相关进程
-                  pm2 stop app || true
-                  pm2 delete app || true
-                  pkill -f "npm start" || true
-                  pkill -f "egg-scripts" || true
+                  # 安全地停止所有相关进程
+                  if pm2 list | grep -q "app"; then
+                    echo "发现 PM2 进程，正在清理..."
+                    pm2 stop app || echo "停止失败"
+                    pm2 delete app || echo "删除失败"
+                  else
+                    echo "未发现 PM2 进程"
+                  fi
+
+                  # 清理其他可能的进程
+                  pkill -f "npm start" || echo "无npm进程"
+                  pkill -f "egg-scripts" || echo "无egg进程"
 
                   # 强制杀死可能的残留进程
-                  pgrep -f "npm start\|egg-scripts" | xargs kill -9 || true
+                  if pgrep -f "npm start\|egg-scripts" >/dev/null 2>&1; then
+                    echo "强制清理残留进程..."
+                    pgrep -f "npm start\|egg-scripts" | xargs kill -9 || echo "强制清理完成"
+                  fi
 
                   echo "清理完成"
                   EOF
