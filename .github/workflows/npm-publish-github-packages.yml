@@ -59,7 +59,7 @@ jobs:
 
             - name: 同步文件到服务器
               run: |
-                  rsync -q --delete \
+                  rsync -qr --delete \
                     --exclude='node_modules/' \
                     --exclude='logs/' \
                     --exclude='*.log' \
