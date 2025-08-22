@@ -58,12 +58,32 @@ jobs:
               run: |
                   ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<'EOF'
                   cd /www/wwwroot/egg-blog
-                  # 保留 node_modules 和隐藏文件
+
+                  # 使用管理员权限清理文件，保留 node_modules 和隐藏文件
+                  echo "正在清理旧文件..."
+
+                  # 先尝试普通权限清理
                   find . -maxdepth 1 \
                     ! -name 'node_modules' \
                     ! -name '.' \
                     ! -name '..' \
-                    -exec rm -rf {} +
+                    ! -name '.*' \
+                    -exec rm -rf {} + 2>/dev/null || {
+                    
+                    echo "普通权限清理失败，使用管理员权限..."
+                    # 如果普通权限失败，使用 sudo
+                    sudo find . -maxdepth 1 \
+                      ! -name 'node_modules' \
+                      ! -name '.' \
+                      ! -name '..' \
+                      ! -name '.*' \
+                      -exec rm -rf {} +
+                  }
+
+                  # 修复可能的权限问题
+                  sudo chown -R ${{ secrets.SSH_USERNAME }}:${{ secrets.SSH_USERNAME }} . || echo "权限修复完成"
+
+                  echo "文件清理完成"
                   EOF
 
             - name: 同步文件到服务器
