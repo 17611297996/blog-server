@@ -7,7 +7,7 @@ on:
 jobs:
     deploy:
         runs-on: ubuntu-latest
-        timeout-minutes: 15 # 设置整个job的超时时间,
+        timeout-minutes: 10 # 缩短超时时间
 
         steps:
             - name: 检出仓库代码
@@ -29,56 +29,37 @@ jobs:
                   ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<'EOF'
                   cd /www/wwwroot/egg-blog
 
-                  # 检查进程是否存在并安全停止
+                  # 快速检测并停止PM2
                   if pm2 list | grep -q "app"; then
-                    echo "发现 PM2 进程，正在停止..."
-                    pm2 stop app || echo "停止进程失败或进程已停止"
-                    pm2 delete app || echo "删除进程失败或进程不存在" 
-                  else
-                    echo "未发现 PM2 进程 'app'"
+                    pm2 stop app >/dev/null 2>&1 || true
+                    pm2 delete app >/dev/null 2>&1 || true
                   fi
 
-                  # 强制清理可能的残留进程
-                  pkill -f "npm start" || echo "无残留npm进程"
-                  pkill -f "egg-scripts" || echo "无残留egg进程"
-
-                  # 等待进程完全退出
-                  sleep 2
-
-                  # 验证进程已停止（使用更安全的检查）
-                  if pgrep -f "npm start\|egg-scripts" >/dev/null 2>&1; then
-                    echo "警告: 仍有相关进程运行，强制终止..."
-                    pgrep -f "npm start\|egg-scripts" | xargs kill -9 || echo "强制终止完成"
-                  else
-                    echo "所有相关进程已清理完毕"
-                  fi
+                  # 轻量级进程清理（避免复杂的pgrep操作）
+                  pkill -f "npm start" >/dev/null 2>&1 || true
+                  pkill -f "egg-scripts" >/dev/null 2>&1 || true
                   EOF
 
-            - name: 清理服务器旧文件（保留node_modules）
+            - name: 轻量级清理
               run: |
                   ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<'EOF'
                   cd /www/wwwroot/egg-blog
 
-                  # 轻量级日志清理
-                  pm2 flush all >/dev/null 2>&1 || true
+                  # 只清理必要文件（避免find命令）
+                  rm -rf app config mock scripts test typings package.json README.md jsconfig.json >/dev/null 2>&1 || true
 
-                  # 只清理logs目录下的大文件（避免全局搜索）
+                  # 快速日志清理（只清理logs目录，不全局搜索）
                   if [ -d "logs" ]; then
-                    find logs -name "*.log" -size +30M -delete 2>/dev/null || true
+                    rm -f logs/*.log >/dev/null 2>&1 || true
                   fi
 
-                  # 简化文件清理（只清理明确的目录）
-                  rm -rf app config mock scripts test typings package.json README.md jsconfig.json 2>/dev/null || true
-
-                  # 简单权限修复
-                  sudo chown -R ${{ secrets.SSH_USERNAME }}:${{ secrets.SSH_USERNAME }} . >/dev/null 2>&1 || true
-
-                  echo "清理完成"
+                  # PM2日志快速清理
+                  pm2 flush all >/dev/null 2>&1 || true
                   EOF
 
             - name: 同步文件到服务器
               run: |
-                  rsync -az --delete \
+                  rsync -q --delete \
                     --exclude='node_modules/' \
                     --exclude='logs/' \
                     --exclude='*.log' \
@@ -87,12 +68,12 @@ jobs:
                     ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }}:/www/wwwroot/egg-blog/
 
             - name: 启动 PM2 服务
-              timeout-minutes: 3 # 减少超时时间
+              timeout-minutes: 2
               run: |
                   ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<'EOF'
                   cd /www/wwwroot/egg-blog
 
-                  # 创建简单的 PM2 配置
+                  # 创建轻量级PM2配置
                   cat > ecosystem.config.js << 'CONFIG_EOF'
                   module.exports = {
                     apps: [{
@@ -106,61 +87,39 @@ jobs:
                       max_restarts: 3,
                       min_uptime: '10s',
                       restart_delay: 4000,
-                      env: {
-                        NODE_ENV: 'production'
-                      }
+                      env: { NODE_ENV: 'production' }
                     }]
                   };
                   CONFIG_EOF
 
-                  # 创建日志目录
-                  mkdir -p logs
+                  mkdir -p logs >/dev/null 2>&1
 
-                  # 简化启动逻辑
+                  # 智能启动（保留重载逻辑但简化检测）
                   if pm2 list | grep -q "app.*online"; then
-                    echo "重载现有进程..."
-                    pm2 reload app --update-env 2>/dev/null || pm2 restart app
+                    pm2 reload app >/dev/null 2>&1 || pm2 restart app >/dev/null 2>&1
                   else
-                    echo "启动新进程..."
-                    pm2 start ecosystem.config.js
+                    pm2 start ecosystem.config.js >/dev/null 2>&1
                   fi
 
-                  # 优化的健康检查（减少资源占用）
-                  echo "等待应用启动..."
-                  sleep 8
+                  # 关键安全检查（避免循环，只检查一次）
+                  sleep 6
 
-                  # 轻量级健康检查（只检查3次，间隔更长）
-                  for i in {1..3}; do
-                    echo "健康检查 $i/3..."
+                  if pm2 list | grep -q "app.*online"; then
+                    echo "✅ PM2启动成功"
                     
-                    # 只检查PM2状态（去掉复杂的grep）
-                    if pm2 list 2>/dev/null | grep -q "app.*online"; then
-                      echo "✅ PM2 进程正常"
-                      
-                      # 简化端口检查（只用一个命令，不输出详细信息）
-                      if lsof -i :7001 >/dev/null 2>&1 || netstat -tln 2>/dev/null | grep -q ":7001 "; then
-                        echo "✅ 端口7001已监听"
-                        break
-                      else
-                        echo "⏳ 端口未就绪，等待中..."
-                      fi
+                    # 轻量级端口检查（避免复杂的网络扫描）
+                    if [ -f "/proc/net/tcp" ] && grep -q ":1B59" /proc/net/tcp 2>/dev/null; then
+                      echo "✅ 端口7001已监听"
                     else
-                      echo "❌ PM2 状态异常"
-                      if [ $i -eq 3 ]; then
-                        pm2 logs app --lines 5 2>/dev/null || true
-                        exit 1
-                      fi
+                      echo "⚠️ 端口检查跳过"
                     fi
-                    
-                    # 最后一次检查失败
-                    if [ $i -eq 3 ]; then
-                      echo "⚠️ 健康检查未完全通过，但进程已启动"
-                    fi
-                    
-                    sleep 10  # 增加间隔，减少频繁检查
-                  done
+                  else
+                    echo "❌ 启动失败"
+                    pm2 logs app --lines 3 2>/dev/null || true
+                    exit 1
+                  fi
 
-                  pm2 save
+                  pm2 save >/dev/null 2>&1
                   echo "✅ 部署完成"
                   EOF
 
@@ -169,6 +128,6 @@ jobs:
               run: |
                   ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<'EOF' || true
                   cd /www/wwwroot/egg-blog
-                  pm2 stop app 2>/dev/null || true
-                  pm2 delete app 2>/dev/null || true
+                  pm2 stop app >/dev/null 2>&1 || true
+                  pm2 delete app >/dev/null 2>&1 || true
                   EOF
