@@ -88,24 +88,84 @@ jobs:
                     echo "✅ 依赖已存在"
                   fi
 
+                  # 检查入口文件和启动脚本
+                  if [ -f "app.js" ]; then
+                    ENTRY_SCRIPT="./app.js"
+                    echo "使用 app.js 启动"
+                  elif [ -f "index.js" ]; then
+                    ENTRY_SCRIPT="./index.js"
+                    echo "使用 index.js 启动"
+                  else
+                    # 检查 package.json 中的启动脚本
+                    if grep -q '"start:prod"' package.json 2>/dev/null; then
+                      ENTRY_SCRIPT="npm"
+                      ENTRY_ARGS="run start:prod"
+                      echo "使用 npm run start:prod 启动"
+                    elif grep -q '"start"' package.json 2>/dev/null; then
+                      ENTRY_SCRIPT="npx"
+                      ENTRY_ARGS="egg-scripts start"
+                      echo "使用 egg-scripts 直接启动"
+                    else
+                      echo "❌ 未找到合适的启动方式"
+                      exit 1
+                    fi
+                  fi
+
                   # 创建轻量级PM2配置
-                  cat > ecosystem.config.js << 'CONFIG_EOF'
+                  if [ "$ENTRY_SCRIPT" = "npm" ]; then
+                    cat > ecosystem.config.js << 'CONFIG_EOF'
                   module.exports = {
                     apps: [{
                       name: 'app',
                       script: 'npm',
-                      args: 'start',
+                      args: 'run start:prod',
                       instances: 1,
-                      autorestart: false,  // 暂时关闭自动重启，避免循环
+                      autorestart: false,
                       watch: false,
                       max_memory_restart: '500M',
-                      max_restarts: 1,     // 减少重启次数
-                      min_uptime: '30s',   // 增加最小运行时间
+                      max_restarts: 1,
+                      min_uptime: '30s',
                       restart_delay: 5000,
                       env: { NODE_ENV: 'production' }
                     }]
                   };
                   CONFIG_EOF
+                  elif [ "$ENTRY_SCRIPT" = "npx" ]; then
+                    cat > ecosystem.config.js << 'CONFIG_EOF'
+                  module.exports = {
+                    apps: [{
+                      name: 'app',
+                      script: 'npx',
+                      args: 'egg-scripts start',
+                      instances: 1,
+                      autorestart: false,
+                      watch: false,
+                      max_memory_restart: '500M',
+                      max_restarts: 1,
+                      min_uptime: '30s',
+                      restart_delay: 5000,
+                      env: { NODE_ENV: 'production' }
+                    }]
+                  };
+                  CONFIG_EOF
+                  else
+                    cat > ecosystem.config.js << CONFIG_EOF
+                  module.exports = {
+                    apps: [{
+                      name: 'app',
+                      script: '$ENTRY_SCRIPT',
+                      instances: 1,
+                      autorestart: false,
+                      watch: false,
+                      max_memory_restart: '500M',
+                      max_restarts: 1,
+                      min_uptime: '30s',
+                      restart_delay: 5000,
+                      env: { NODE_ENV: 'production' }
+                    }]
+                  };
+                  CONFIG_EOF
+                  fi
 
                   mkdir -p logs >/dev/null 2>&1
 
