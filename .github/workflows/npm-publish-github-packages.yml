@@ -7,6 +7,7 @@ on:
 jobs:
     deploy:
         runs-on: ubuntu-latest
+        timeout-minutes: 15 # 设置整个job的超时时间
 
         steps:
             - name: 检出仓库代码
@@ -25,16 +26,28 @@ jobs:
 
             - name: 停止 PM2 服务
               run: |
-                  ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<EOF
+                  ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<'EOF'
                   cd /www/wwwroot/egg-blog
+
+                  # 强制停止所有相关进程
                   pm2 stop app || echo "无需停止"
                   pm2 delete app || echo "无需删除"
                   pkill -f "npm start" || echo "无残留进程"
+                  pkill -f "egg-scripts" || echo "无egg进程"
+
+                  # 等待进程完全退出
+                  sleep 2
+
+                  # 验证进程已停止
+                  if pgrep -f "npm start\|egg-scripts"; then
+                    echo "警告: 仍有相关进程运行"
+                    pgrep -f "npm start\|egg-scripts" | xargs kill -9 || true
+                  fi
                   EOF
 
             - name: 清理服务器旧文件（保留node_modules）
               run: |
-                  ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<EOF
+                  ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<'EOF'
                   cd /www/wwwroot/egg-blog
                   # 保留 node_modules 和隐藏文件
                   find . -maxdepth 1 \
@@ -54,16 +67,124 @@ jobs:
                     ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }}:/www/wwwroot/egg-blog/
 
             - name: 启动 PM2 服务
+              timeout-minutes: 5 # 设置启动步骤的超时时间
               run: |
-                  ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<EOF
+                  ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<'EOF'
+                  set -e  # 遇到错误立即退出
+
                   cd /www/wwwroot/egg-blog
-                  # 检查是否已存在进程
-                  if pm2 list | grep -q app; then
-                    pm2 reload app --update-env
-                  else
-                    pm2 start npm --name "app" -- start
+
+                  # 检查目录和文件
+                  if [ ! -f "package.json" ]; then
+                    echo "错误: package.json 不存在"
+                    exit 1
                   fi
+
+                  # 创建 PM2 配置文件（带错误处理）
+                  cat > ecosystem.config.js << 'CONFIG_EOF'
+                  module.exports = {
+                    apps: [{
+                      name: 'app',
+                      script: 'npm',
+                      args: 'start',
+                      instances: 1,
+                      autorestart: true,
+                      watch: false,
+                      max_memory_restart: '500M',
+                      error_file: './logs/err.log',
+                      out_file: './logs/out.log',
+                      log_file: './logs/combined.log',
+                      time: true,
+                      max_restarts: 3,        # 最大重启次数
+                      min_uptime: '10s',      # 最小运行时间
+                      restart_delay: 4000,    # 重启延迟
+                      env: {
+                        NODE_ENV: 'production'
+                      }
+                    }]
+                  };
+                  CONFIG_EOF
+
+                  # 创建日志目录
+                  mkdir -p logs
+
+                  # 检查是否已存在进程
+                  if pm2 list | grep -q "app.*online\|app.*stopped\|app.*errored"; then
+                    echo "检测到已存在的 PM2 进程，正在重载..."
+                    if ! pm2 reload app --update-env; then
+                      echo "重载失败，尝试重启..."
+                      pm2 stop app || true
+                      pm2 delete app || true
+                      echo "正在重新启动 PM2 服务..."
+                      if ! pm2 start ecosystem.config.js; then
+                        echo "错误: PM2 启动失败"
+                        pm2 logs app --lines 10 || true
+                        exit 1
+                      fi
+                    fi
+                  else
+                    echo "未检测到现有进程，正在启动新的 PM2 服务..."
+                    if ! pm2 start ecosystem.config.js; then
+                      echo "错误: PM2 启动失败"
+                      pm2 logs app --lines 10 || true
+                      exit 1
+                    fi
+                  fi
+
+                  # 等待应用启动
+                  echo "等待应用启动..."
+                  sleep 10
+
+                  # 健康检查
+                  for i in {1..6}; do
+                    echo "健康检查 $i/6..."
+                    
+                    # 检查PM2状态
+                    if ! pm2 list | grep -q "app.*online"; then
+                      echo "错误: 应用未正常运行"
+                      pm2 logs app --lines 20
+                      pm2 stop app || true
+                      pm2 delete app || true
+                      exit 1
+                    fi
+                    
+                    # 检查端口占用（假设你的应用运行在7001端口）
+                    if netstat -tlnp | grep -q ":7001.*LISTEN"; then
+                      echo "✅ 应用启动成功，端口7001正在监听"
+                      break
+                    fi
+                    
+                    if [ $i -eq 6 ]; then
+                      echo "❌ 健康检查失败，应用未能正常启动"
+                      pm2 logs app --lines 20
+                      pm2 stop app || true
+                      pm2 delete app || true
+                      exit 1
+                    fi
+                    
+                    sleep 5
+                  done
+
+                  # 保存PM2配置
                   pm2 save
-                  # 避免重复设置启动项（建议提前手动设置）
-                  # sudo env PATH=$PATH:/www/server/nvm/versions/node/v18.20.8/bin /www/server/nvm/versions/node/v18.20.8/lib/node_modules/pm2/bin/pm2 startup systemd -u ${{ secrets.SSH_USERNAME }} --hp /home/${{ secrets.SSH_USERNAME }}
+                  echo "✅ 部署成功"
+                  EOF
+
+            - name: 部署失败时清理
+              if: failure()
+              run: |
+                  echo "⚠️ 部署失败，正在清理..."
+                  ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<'EOF' || true
+                  cd /www/wwwroot/egg-blog
+
+                  # 停止所有相关进程
+                  pm2 stop app || true
+                  pm2 delete app || true
+                  pkill -f "npm start" || true
+                  pkill -f "egg-scripts" || true
+
+                  # 强制杀死可能的残留进程
+                  pgrep -f "npm start\|egg-scripts" | xargs kill -9 || true
+
+                  echo "清理完成"
                   EOF
