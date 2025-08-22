@@ -59,6 +59,24 @@ jobs:
                   ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<'EOF'
                   cd /www/wwwroot/egg-blog
 
+                  echo "=== 磁盘使用情况 ==="
+                  df -h
+
+                  echo "=== 清理PM2日志 ==="
+                  # 清理PM2日志文件
+                  pm2 flush all || echo "PM2日志清理完成"
+
+                  echo "=== 清理应用日志 ==="
+                  # 清理应用相关日志
+                  sudo find . -name "*.log" -type f -size +10M -delete 2>/dev/null || echo "大日志文件清理完成"
+                  sudo find . -name "*.log.*" -type f -mtime +7 -delete 2>/dev/null || echo "旧日志文件清理完成"
+
+                  echo "=== 清理临时文件 ==="
+                  # 清理临时文件和缓存
+                  sudo find /tmp -name "*egg*" -type f -mtime +1 -delete 2>/dev/null || echo "临时文件清理完成"
+                  sudo find . -name ".tmp" -type d -exec rm -rf {} + 2>/dev/null || echo "临时目录清理完成"
+
+                  echo "=== 清理项目文件 ==="
                   # 使用管理员权限清理文件，保留 node_modules 和隐藏文件
                   echo "正在清理旧文件..."
 
@@ -83,6 +101,8 @@ jobs:
                   # 修复可能的权限问题
                   sudo chown -R ${{ secrets.SSH_USERNAME }}:${{ secrets.SSH_USERNAME }} . || echo "权限修复完成"
 
+                  echo "=== 清理后磁盘使用情况 ==="
+                  df -h
                   echo "文件清理完成"
                   EOF
 
@@ -127,12 +147,23 @@ jobs:
                       max_restarts: 3,        // 最大重启次数
                       min_uptime: '10s',      // 最小运行时间
                       restart_delay: 4000,    // 重启延迟
+                      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+                      merge_logs: true,
+                      log_type: 'json',
                       env: {
                         NODE_ENV: 'production'
                       }
                     }]
                   };
                   CONFIG_EOF
+
+                  # 安装并配置 PM2 日志轮转
+                  echo "配置 PM2 日志轮转..."
+                  pm2 install pm2-logrotate || echo "pm2-logrotate 已安装"
+                  pm2 set pm2-logrotate:max_size 10M || echo "设置日志大小限制"
+                  pm2 set pm2-logrotate:retain 7 || echo "设置日志保留天数"
+                  pm2 set pm2-logrotate:compress true || echo "启用日志压缩"
+                  pm2 set pm2-logrotate:dateFormat 'YYYY-MM-DD_HH-mm-ss' || echo "设置日志格式"
 
                   # 创建日志目录
                   mkdir -p logs
@@ -216,6 +247,23 @@ jobs:
                   # 保存PM2配置
                   pm2 save
                   echo "✅ 部署成功"
+
+                  # 最终磁盘检查和清理建议
+                  echo "=== 最终磁盘使用情况 ==="
+                  df -h
+
+                  # 检查磁盘使用率
+                  DISK_USAGE=$(df / | awk 'NR==2 {print $5}' | sed 's/%//')
+                  if [ "$DISK_USAGE" -gt 80 ]; then
+                    echo "⚠️  警告: 磁盘使用率过高 ($DISK_USAGE%)"
+                    echo "建议清理操作："
+                    echo "1. sudo journalctl --vacuum-time=7d"
+                    echo "2. sudo apt autoremove && sudo apt autoclean"
+                    echo "3. docker system prune -f (如果使用Docker)"
+                    echo "4. 检查大文件: du -h --max-depth=1 / | sort -hr"
+                  else
+                    echo "✅ 磁盘使用率正常 ($DISK_USAGE%)"
+                  fi
                   EOF
 
             - name: 部署失败时清理
