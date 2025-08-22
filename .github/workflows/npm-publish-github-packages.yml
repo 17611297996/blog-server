@@ -109,8 +109,8 @@ jobs:
                   mkdir -p logs
 
                   # 检查是否已存在进程
-                  if pm2 list | grep -q "app.*online\|app.*stopped\|app.*errored"; then
-                    echo "检测到已存在的 PM2 进程，正在重载..."
+                  if pm2 list | grep -q "app.*online"; then
+                    echo "检测到在线的 PM2 进程，正在重载..."
                     if ! pm2 reload app --update-env; then
                       echo "重载失败，尝试重启..."
                       pm2 stop app || true
@@ -121,6 +121,15 @@ jobs:
                         pm2 logs app --lines 10 || true
                         exit 1
                       fi
+                    fi
+                  elif pm2 list | grep -q "app.*stopped\|app.*errored"; then
+                    echo "检测到已停止或错误的 PM2 进程，正在重启..."
+                    pm2 delete app || true
+                    echo "正在启动 PM2 服务..."
+                    if ! pm2 start ecosystem.config.js; then
+                      echo "错误: PM2 启动失败"
+                      pm2 logs app --lines 10 || true
+                      exit 1
                     fi
                   else
                     echo "未检测到现有进程，正在启动新的 PM2 服务..."
