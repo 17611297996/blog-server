@@ -124,9 +124,9 @@ jobs:
                       out_file: './logs/out.log',
                       log_file: './logs/combined.log',
                       time: true,
-                      max_restarts: 3,        # 最大重启次数
-                      min_uptime: '10s',      # 最小运行时间
-                      restart_delay: 4000,    # 重启延迟
+                      max_restarts: 3,        // 最大重启次数
+                      min_uptime: '10s',      // 最小运行时间
+                      restart_delay: 4000,    // 重启延迟
                       env: {
                         NODE_ENV: 'production'
                       }
