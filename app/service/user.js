@@ -8,72 +8,61 @@ class UserService extends Service {
      */
     async getUsersData() {
         try {
-            const usersPath = path.join(this.app.baseDir, 'mock/users.json');
-            const data = await fs.readFile(usersPath, 'utf-8');
+            const filePath = path.join(this.app.baseDir, 'mock/users.json');
+            const data = await fs.readFile(filePath, 'utf-8');
             return JSON.parse(data);
         } catch (error) {
-            this.logger.error('Failed to read users data:', error);
-            return { users: [], metadata: {} };
+            this.ctx.logger.error('读取用户数据失败:', error);
+            return { users: [] };
         }
     }
 
     /**
-     * 根据ID获取用户
-     * @param {number} id - 用户ID
+     * 根据ID获取用户信息
      */
     async getUserById(id) {
         const { users } = await this.getUsersData();
-        const user = users.find(user => user.id == id);
-
-        if (user) {
-            // 移除敏感信息
-            const { password, ...safeUser } = user;
-            return safeUser;
-        }
-
-        return null;
+        return users.find(user => user.id === parseInt(id));
     }
 
     /**
-     * 根据用户名获取用户
-     * @param {string} username - 用户名
+     * 根据用户名获取用户信息
      */
     async getUserByUsername(username) {
         const { users } = await this.getUsersData();
-        const user = users.find(user => user.username === username);
-
-        if (user) {
-            // 移除敏感信息
-            const { password, ...safeUser } = user;
-            return safeUser;
-        }
-
-        return null;
+        return users.find(user => user.username === username);
     }
 
     /**
-     * 获取用户的文章统计
-     * @param {number} userId - 用户ID
+     * 获取用户文章统计（动态计算）
      */
     async getUserArticleStats(userId) {
-        const { articles } = await this.service.article.getArticlesData();
+        // 获取文章数据
+        const articlesData = await this.ctx.service.article.getArticlesData();
+        const userArticles = articlesData.articles.filter(article =>
+            article.author === userId || article.authorId === userId
+        );
 
-        const userArticles = articles.filter(article => article.author === userId || article.authorId === userId);
-        const publishedArticles = userArticles.filter(article => article.status === 'published');
-        const draftArticles = userArticles.filter(article => article.status === 'draft');
+        // 计算统计信息
+        const totalArticles = userArticles.length;
+        const publishedArticles = userArticles.filter(article => article.status === 'published').length;
+        const draftArticles = totalArticles - publishedArticles;
 
-        // 计算总阅读量
-        const totalViews = userArticles.reduce((sum, article) => sum + (article.views || 0), 0);
-        const totalLikes = userArticles.reduce((sum, article) => sum + (article.likes || 0), 0);
+        // 获取最新文章
+        const latestArticle = userArticles
+            .sort((a, b) => new Date(b.publishDate) - new Date(a.publishDate))[0];
 
         return {
-            totalArticles: userArticles.length,
-            publishedArticles: publishedArticles.length,
-            draftArticles: draftArticles.length,
-            totalViews,
-            totalLikes,
-            latestArticle: publishedArticles.length > 0 ?
-                publishedArticles.sort((a, b) => new Date(b.publishDate) - new Date(a.publishDate))[0] : null
+            totalArticles,
+            publishedArticles,
+            draftArticles,
+            totalViews: 0, // 如果需要可以后续添加浏览量统计
+            totalLikes: 0, // 如果需要可以后续添加点赞统计
+            latestArticle: latestArticle ? {
+                id: latestArticle.id,
+                title: latestArticle.title,
+                publishDate: latestArticle.publishDate
+            } : null
         };
     }
 
@@ -106,7 +95,6 @@ class UserService extends Service {
             username: authorIdentifier,
             displayName: authorIdentifier,
             avatar: '',
-            bio: '',
             stats: {
                 totalArticles: 0,
                 publishedArticles: 0,
@@ -123,28 +111,22 @@ class UserService extends Service {
      */
     async getAllAuthors() {
         const { users } = await this.getUsersData();
-        const { articles } = await this.service.article.getArticlesData();
 
-        // 找出所有有文章的作者
-        const authorsWithArticles = [];
-
-        for (const user of users) {
-            const userArticles = articles.filter(article =>
-                article.author === user.username || article.authorId === user.id
-            );
-
-            if (userArticles.length > 0) {
+        // 为每个作者添加统计信息
+        const authorsWithStats = await Promise.all(
+            users.map(async (user) => {
                 const stats = await this.getUserArticleStats(user.id);
-                const { password, ...safeUser } = user;
-
-                authorsWithArticles.push({
-                    ...safeUser,
+                return {
+                    ...user,
                     stats
-                });
-            }
-        }
+                };
+            })
+        );
 
-        return authorsWithArticles.sort((a, b) => b.stats.totalArticles - a.stats.totalArticles);
+        // 按文章数量排序
+        return authorsWithStats
+            .filter(author => author.stats.totalArticles > 0)
+            .sort((a, b) => b.stats.totalArticles - a.stats.totalArticles);
     }
 }
 
