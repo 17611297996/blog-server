@@ -67,11 +67,26 @@ jobs:
                     $GITHUB_WORKSPACE/ \
                     ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }}:/www/wwwroot/egg-blog/
 
-            - name: 启动 PM2 服务
-              timeout-minutes: 2
+            - name: 安装依赖并启动服务
+              timeout-minutes: 3
               run: |
                   ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<'EOF'
                   cd /www/wwwroot/egg-blog
+
+                  # 检查基本环境
+                  if [ ! -f "package.json" ]; then
+                    echo "❌ package.json 不存在"
+                    exit 1
+                  fi
+
+                  # 检查并安装依赖
+                  if [ ! -d "node_modules" ] || [ ! -f "node_modules/.installed" ]; then
+                    echo "📦 安装/更新依赖..."
+                    npm install --production --silent >/dev/null 2>&1
+                    touch node_modules/.installed
+                  else
+                    echo "✅ 依赖已存在"
+                  fi
 
                   # 创建轻量级PM2配置
                   cat > ecosystem.config.js << 'CONFIG_EOF'
@@ -81,12 +96,12 @@ jobs:
                       script: 'npm',
                       args: 'start',
                       instances: 1,
-                      autorestart: true,
+                      autorestart: false,  // 暂时关闭自动重启，避免循环
                       watch: false,
                       max_memory_restart: '500M',
-                      max_restarts: 3,
-                      min_uptime: '10s',
-                      restart_delay: 4000,
+                      max_restarts: 1,     // 减少重启次数
+                      min_uptime: '30s',   // 增加最小运行时间
+                      restart_delay: 5000,
                       env: { NODE_ENV: 'production' }
                     }]
                   };
@@ -96,26 +111,48 @@ jobs:
 
                   # 智能启动（保留重载逻辑但简化检测）
                   if pm2 list | grep -q "app.*online"; then
+                    echo "重载现有进程..."
                     pm2 reload app >/dev/null 2>&1 || pm2 restart app >/dev/null 2>&1
                   else
+                    echo "启动新进程..."
                     pm2 start ecosystem.config.js >/dev/null 2>&1
                   fi
 
-                  # 关键安全检查（避免循环，只检查一次）
-                  sleep 6
+                  # 关键安全检查（增加等待时间）
+                  echo "等待应用启动..."
+                  sleep 15
+
+                  # 检查启动状态
+                  PM2_STATUS=$(pm2 list | grep "app" | awk '{print $10}' | head -1)
+                  echo "PM2 状态: $PM2_STATUS"
 
                   if pm2 list | grep -q "app.*online"; then
                     echo "✅ PM2启动成功"
                     
-                    # 轻量级端口检查（避免复杂的网络扫描）
+                    # 轻量级端口检查
                     if [ -f "/proc/net/tcp" ] && grep -q ":1B59" /proc/net/tcp 2>/dev/null; then
                       echo "✅ 端口7001已监听"
                     else
-                      echo "⚠️ 端口检查跳过"
+                      echo "⚠️ 端口未监听，检查应用日志..."
+                      pm2 logs app --lines 5 2>/dev/null || true
                     fi
+                    
+                    # 启用自动重启
+                    pm2 set app autorestart true >/dev/null 2>&1 || true
                   else
-                    echo "❌ 启动失败"
-                    pm2 logs app --lines 3 2>/dev/null || true
+                    echo "❌ 启动失败，查看详细错误:"
+                    echo "=== PM2 状态 ==="
+                    pm2 list
+                    echo "=== 错误日志 ==="
+                    pm2 logs app --lines 10 2>/dev/null || true
+                    echo "=== 检查文件权限 ==="
+                    ls -la package.json
+                    echo "=== 检查依赖 ==="
+                    if [ -d "node_modules" ]; then
+                      echo "node_modules 存在"
+                    else
+                      echo "node_modules 不存在"
+                    fi
                     exit 1
                   fi
 
