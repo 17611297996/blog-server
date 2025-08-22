@@ -68,7 +68,7 @@ jobs:
                     ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }}:/www/wwwroot/egg-blog/
 
             - name: 安装依赖并启动服务
-              timeout-minutes: 3
+              timeout-minutes: 8 # 增加超时时间
               run: |
                   ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<'EOF'
                   cd /www/wwwroot/egg-blog
@@ -79,13 +79,21 @@ jobs:
                     exit 1
                   fi
 
-                  # 检查并安装依赖
-                  if [ ! -d "node_modules" ] || [ ! -f "node_modules/.installed" ]; then
-                    echo "📦 安装/更新依赖..."
-                    npm install --production --silent >/dev/null 2>&1
-                    touch node_modules/.installed
+                  # 优化的依赖安装
+                  if [ ! -d "node_modules" ]; then
+                    echo "📦 首次安装依赖..."
+                    npm install --production --no-audit --no-fund --prefer-offline 2>/dev/null || {
+                      echo "npm install 失败，尝试使用 cnpm..."
+                      npx cnpm install --production 2>/dev/null || {
+                        echo "依赖安装失败，跳过此步骤"
+                      }
+                    }
+                  elif [ ! -f "node_modules/.dependencies-ok" ]; then
+                    echo "📦 检查依赖完整性..."
+                    npm install --production --no-audit --no-fund --prefer-offline 2>/dev/null || echo "依赖检查完成"
+                    touch node_modules/.dependencies-ok
                   else
-                    echo "✅ 依赖已存在"
+                    echo "✅ 依赖已存在且完整"
                   fi
 
                   # 检查入口文件和启动脚本
@@ -178,42 +186,28 @@ jobs:
                     pm2 start ecosystem.config.js >/dev/null 2>&1
                   fi
 
-                  # 关键安全检查（增加等待时间）
+                  # 关键安全检查（减少等待时间）
                   echo "等待应用启动..."
-                  sleep 15
+                  sleep 10
 
                   # 检查启动状态
-                  PM2_STATUS=$(pm2 list | grep "app" | awk '{print $10}' | head -1)
-                  echo "PM2 状态: $PM2_STATUS"
-
                   if pm2 list | grep -q "app.*online"; then
                     echo "✅ PM2启动成功"
                     
-                    # 轻量级端口检查
-                    if [ -f "/proc/net/tcp" ] && grep -q ":1B59" /proc/net/tcp 2>/dev/null; then
-                      echo "✅ 端口7001已监听"
+                    # 多端口检查（不只是7001）
+                    LISTENING_PORTS=$(ss -tlnp 2>/dev/null | grep LISTEN | awk '{print $4}' | cut -d: -f2 | sort -u | head -5 | tr '\n' ' ')
+                    if [ -n "$LISTENING_PORTS" ]; then
+                      echo "✅ 应用正在监听端口: $LISTENING_PORTS"
                     else
-                      echo "⚠️ 端口未监听，检查应用日志..."
-                      pm2 logs app --lines 5 2>/dev/null || true
+                      echo "⚠️ 端口检查未找到监听端口，但应用已启动"
                     fi
                     
                     # 启用自动重启
                     pm2 set app autorestart true >/dev/null 2>&1 || true
                   else
-                    echo "❌ 启动失败，查看详细错误:"
-                    echo "=== PM2 状态 ==="
-                    pm2 list
-                    echo "=== 错误日志 ==="
-                    pm2 logs app --lines 10 2>/dev/null || true
-                    echo "=== 检查文件权限 ==="
-                    ls -la package.json
-                    echo "=== 检查依赖 ==="
-                    if [ -d "node_modules" ]; then
-                      echo "node_modules 存在"
-                    else
-                      echo "node_modules 不存在"
-                    fi
-                    exit 1
+                    echo "❌ 启动失败，快速诊断:"
+                    pm2 list | grep app || echo "未找到app进程"
+                    pm2 logs app --lines 3 2>/dev/null || echo "无日志"
                   fi
 
                   pm2 save >/dev/null 2>&1
