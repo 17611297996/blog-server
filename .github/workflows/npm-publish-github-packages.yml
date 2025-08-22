@@ -177,9 +177,12 @@ jobs:
                   for i in {1..6}; do
                     echo "健康检查 $i/6..."
                     
-                    # 检查PM2状态
-                    if ! pm2 list | grep -q "app.*online"; then
-                      echo "错误: 应用未正常运行"
+                    # 检查PM2状态 - 使用更精确的匹配
+                    if pm2 list | grep -E "app.*online" >/dev/null 2>&1; then
+                      echo "✅ PM2 进程状态正常"
+                    else
+                      echo "❌ PM2 进程状态异常"
+                      pm2 list
                       pm2 logs app --lines 20
                       pm2 stop app || true
                       pm2 delete app || true
@@ -187,14 +190,21 @@ jobs:
                     fi
                     
                     # 检查端口占用（假设你的应用运行在7001端口）
-                    if netstat -tlnp | grep -q ":7001.*LISTEN"; then
+                    if netstat -tlnp 2>/dev/null | grep -q ":7001.*LISTEN" || ss -tlnp 2>/dev/null | grep -q ":7001.*LISTEN"; then
                       echo "✅ 应用启动成功，端口7001正在监听"
                       break
+                    else
+                      echo "⏳ 端口7001暂未监听，继续等待..."
                     fi
                     
                     if [ $i -eq 6 ]; then
                       echo "❌ 健康检查失败，应用未能正常启动"
+                      echo "PM2 状态："
+                      pm2 list
+                      echo "应用日志："
                       pm2 logs app --lines 20
+                      echo "端口占用情况："
+                      netstat -tlnp 2>/dev/null | grep LISTEN || ss -tlnp 2>/dev/null | grep LISTEN
                       pm2 stop app || true
                       pm2 delete app || true
                       exit 1
