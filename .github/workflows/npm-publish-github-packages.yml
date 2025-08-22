@@ -59,23 +59,19 @@ jobs:
                   ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<'EOF'
                   cd /www/wwwroot/egg-blog
 
-                  echo "=== 快速清理开始 ==="
+                  # 使用管理员权限清理文件，保留 node_modules 和隐藏文件
+                  echo "正在清理旧文件..."
 
-                  # 轻量级PM2日志清理
-                  pm2 flush all >/dev/null 2>&1 || echo "PM2日志已清理"
-
-                  # 只清理超大日志文件（避免频繁find操作）
-                  if [ -d "logs" ]; then
-                    find logs -name "*.log" -size +50M -delete 2>/dev/null || true
-                  fi
-
-                  # 清理项目文件（保持原有逻辑但更高效）
+                  # 先尝试普通权限清理
                   find . -maxdepth 1 \
                     ! -name 'node_modules' \
                     ! -name '.' \
                     ! -name '..' \
                     ! -name '.*' \
                     -exec rm -rf {} + 2>/dev/null || {
+                    
+                    echo "普通权限清理失败，使用管理员权限..."
+                    # 如果普通权限失败，使用 sudo
                     sudo find . -maxdepth 1 \
                       ! -name 'node_modules' \
                       ! -name '.' \
@@ -84,10 +80,10 @@ jobs:
                       -exec rm -rf {} +
                   }
 
-                  # 简单权限修复（只针对当前目录）
-                  sudo chown -R ${{ secrets.SSH_USERNAME }}:${{ secrets.SSH_USERNAME }} . >/dev/null 2>&1 || true
+                  # 修复可能的权限问题
+                  sudo chown -R ${{ secrets.SSH_USERNAME }}:${{ secrets.SSH_USERNAME }} . || echo "权限修复完成"
 
-                  echo "快速清理完成"
+                  echo "文件清理完成"
                   EOF
 
             - name: 同步文件到服务器
@@ -113,7 +109,7 @@ jobs:
                     exit 1
                   fi
 
-                  # 创建 PM2 配置文件（轻量化配置）
+                  # 创建 PM2 配置文件（带错误处理）
                   cat > ecosystem.config.js << 'CONFIG_EOF'
                   module.exports = {
                     apps: [{
@@ -137,15 +133,6 @@ jobs:
                     }]
                   };
                   CONFIG_EOF
-
-                  # 一次性配置 PM2 日志轮转（避免重复安装）
-                  if ! pm2 list | grep -q "pm2-logrotate"; then
-                    echo "首次安装 PM2 日志轮转..."
-                    pm2 install pm2-logrotate >/dev/null 2>&1 || true
-                    pm2 set pm2-logrotate:max_size 10M >/dev/null 2>&1 || true
-                    pm2 set pm2-logrotate:retain 5 >/dev/null 2>&1 || true
-                    pm2 set pm2-logrotate:compress true >/dev/null 2>&1 || true
-                  fi
 
                   # 创建日志目录
                   mkdir -p logs
@@ -229,14 +216,6 @@ jobs:
                   # 保存PM2配置
                   pm2 save
                   echo "✅ 部署成功"
-
-                  # 轻量级磁盘检查（避免过多系统调用）
-                  DISK_USAGE=$(df / | awk 'NR==2 {print $5}' | sed 's/%//' 2>/dev/null || echo "0")
-                  if [ "$DISK_USAGE" -gt 85 ]; then
-                    echo "⚠️  磁盘使用率较高: $DISK_USAGE%"
-                  else
-                    echo "✅ 磁盘使用正常: $DISK_USAGE%"
-                  fi
                   EOF
 
             - name: 部署失败时清理
