@@ -7,7 +7,7 @@ on:
 jobs:
     deploy:
         runs-on: ubuntu-latest
-        timeout-minutes: 15 # 设置整个job的超时时间
+        timeout-minutes: 15 # 设置整个job的超时时间,
 
         steps:
             - name: 检出仓库代码
