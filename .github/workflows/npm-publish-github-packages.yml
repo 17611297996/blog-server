@@ -59,6 +59,15 @@ jobs:
                   ssh -i ~/.ssh/github_actions_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} <<'EOF'
                   cd /www/wwwroot/egg-blog
 
+                  # 清理PM2日志
+                  pm2 flush all 2>/dev/null || echo "PM2日志已清理"
+
+                  # 清理大日志文件（超过20M的）
+                  find . -name "*.log" -size +20M -delete 2>/dev/null || echo "大日志文件已清理"
+
+                  # 清理7天前的日志文件
+                  find . -name "*.log.*" -mtime +7 -delete 2>/dev/null || echo "旧日志文件已清理"
+
                   # 使用管理员权限清理文件，保留 node_modules 和隐藏文件
                   echo "正在清理旧文件..."
 
