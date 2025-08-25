@@ -1,6 +1,32 @@
 {
   "articles": [
     {
+      "id": 3616810700,
+      "title": "JavaScript 中的数据拷贝指南 🧭",
+      "slug": "javascript-copy",
+      "excerpt": "在 JavaScript 编程中，数据的复制是一个基础而又至关重要的概念，尤其在处理复杂的数据结构时，正确地执行拷贝操作可以避免意料之外的数据修改问题...",
+      "content": "> 发布时间：2025-08-24  \n> 分类：前端开发 > JavaScript.js  \n> 标签：JavaScript, 数据拷贝, 前端开发\n\n## 引言\n\n在 JavaScript 编程中，数据的复制是一个基础而又至关重要的概念，尤其在处理复杂的数据结构时，正确地执行拷贝操作可以避免意料之外的数据修改问题\n\n## 浅拷贝与深拷贝的区别\n\n在 JavaScript 中，数据拷贝通常指的是对象或数组的复制。根据是否进行深层次的复制，可以分为浅拷贝和深拷贝。\n\n### 浅拷贝\n\n浅拷贝只会复制对象的第一层属性。如果属性值是基本数据类型（如数字、字符串、布尔值等），则复制的是值；如果属性值是对象或数组（即引用类型），则复制的是引用（即指针），而不是对象本身。\n\n### 深拷贝\n\n深拷贝会递归复制对象的所有层级，创建一个完全独立的副本。这意味着原始对象和拷贝对象没有任何共享的引用。\n\n深拷贝确保对象的每个属性都是新创建的，修改拷贝对象不会影响原始对象\n\n## 浅拷贝的常用方法\n\n### Object.create\n\n新对象的原型被设置为原对象\n\n```javascript\nconst original = {\n  name: 'John',\n  age: 30,\n  address: {\n      city: 'New York',\n      zip: '10001'\n}\nconst newObj = Object.create(original)\nconsole.log(newObj, 'newObj')\n```\n\n### Object.assign\n\n```javascript\nconst original = {\n  name: 'John',\n  age: 30,\n  address: {\n      city: 'New York',\n      zip: '10001'\n},\nconst newObj = Object.assign({}, original)\nconsole.log(newObj, 'newObjg')\n```\n\n### 展开运算符\n\n```javascript\nconst original = {\n  name: 'John',\n  age: 30,\n  address: {\n      city: 'New York',\n      zip: '10001'\n},\nconst newObj = {...original}\nconsole.log(newObj, 'newObjg')\n```\n\n## 深拷贝的常用方法\n\n### **JSON.parse(JSON.stringify(obj))**\n\n1：无法识别 BigInt 类型： 当对象中包含 BigInt 类型的值时，这个方法会将其转换为字符串，因为 JSON 标准不支持 BigInt 类型。因此，复制后的对象中的 BigInt 值不再是 BigInt，而是字符串。\n\n2：无法拷贝 undefined、function、Symbol 属性：\n\n（1）：undefined 的属性值会被忽略，因为它不是 JSON 格式的一部分。\n\n（2）：函数（function）作为对象的属性不能被序列化，所以在解析后会丢失。\n\n（3）：Symbol 作为键或值同样不会被处理，因为 JSON.stringify 会忽略 Symbol 类型的键，且 Symbol 值也不能被直接序列化。\n\n3：无法处理循环引用： 如果对象结构中存在循环引用（即对象 A 的某个属性引用了对象 B，同时对象 B 的某个属性又引用了对象 A），JSON.stringify 会抛出错误，因为它无法正确地序列化这样的结构。\n\n```javascript\nlet obj = {\n    a: 3,\n    b: { n: 2 },\n    c: 'ccccc',\n    d: true,\n    e: undefined,\n    f: null,\n    g: function () {},\n    h: Symbol(1)\n}\n\nlet newObj = JSON.parse(JSON.stringify(obj))\nconsole.log(newObj) //{ a: 3, b: { n: 2 }, c: 'ccccc', d: true, f: null }\nobj.b.n = 1\nconsole.log(newObj) //{ a: 3, b: { n: 2 }, c: 'ccccc', d: true, f: null }\n//实现了深度拷贝，但是没有拷贝`undefined`、`function`、`Symbol`\n```\n\n**不能被 json 序列化的，都不支持**\n\n### **structuredClone(obj)**\n\n是一个较新的 API（在某些现代浏览器和 Node.js 中可用），它能完美地克隆大多数值，包括循环引用，但兼容性可能不是那么好。\n\n```javascript\nlet obj = {\n    a: 1,\n    b: { n: 1 }\n}\n\nconst newObj = structuredClone(obj)\nobj.b.n = 3\nconsole.log(newObj) //{ a: 1, b: { n: 1 } }\n```\n\n### 手写一个深拷贝方法\n\n支持大部分场景\n\n```javascript\nconst deepCopy = obj => {\n    if (obj !== null || typeof obj !== 'object') {\n        //排出这两类类型直接return\n        return obj\n    }\n    //如果是数组\n    if (obj instanceof Array) {\n        const copy = []\n        obj.forEach(item => copy.push(item))\n        return copy\n    }\n    //如果是日期\n    if (obj instanceof Date) {\n        return new Date(obj)\n    }\n    //如果是对象\n    if (obj instanceof Object) {\n        const copy = {}\n        Object.kyes(obj).forEach(key => {\n            copy[key] = deepCopy(obj[key])\n        })\n        return copy\n    }\n    throw new Error('报错！！')\n}\nconst obj = {\n    name: '张三',\n    age: 18,\n    getInfo: () => {},\n    info: {\n        a: '1',\n        b: { b: 2 },\n        c: true\n    },\n    time: new Date(),\n    pattern: /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/\n}\nconst newObj = deepCopy(obj)\nconsole.log(newObj, 'obj-->>')\n```\n\n## 总结\n\n-   **浅拷贝：复制对象的第一层属性，嵌套的对象或数组共享引用。**\n\n-   **深拷贝：递归复制对象的所有层级，创建完全独立的副本。**\n",
+      "categoryId": 1,
+      "categorySlug": "frontend",
+      "categorySlugs": [
+        "frontend"
+      ],
+      "tags": [
+        "JavaScript",
+        "数据拷贝",
+        "前端开发"
+      ],
+      "author": "admin",
+      "publishDate": "2025-08-24T00:00:00.000Z",
+      "updateDate": "2025-08-25T03:17:57.616Z",
+      "status": "published",
+      "views": 0,
+      "likes": 0,
+      "comments": 0,
+      "featured": false,
+      "coverImage": "content/assets/images/javascript-copy-cover.jpg"
+    },
+    {
       "id": 1823977704,
       "title": "JavaScript Woker 多线程",
       "slug": "javascript-worker",
@@ -19,7 +45,7 @@
       ],
       "author": "admin",
       "publishDate": "2024-05-20T00:00:00.000Z",
-      "updateDate": "2025-08-22T09:35:01.070Z",
+      "updateDate": "2025-08-25T03:17:57.625Z",
       "status": "published",
       "views": 0,
       "likes": 0,
@@ -46,7 +72,7 @@
       ],
       "author": "admin",
       "publishDate": "2024-01-20T00:00:00.000Z",
-      "updateDate": "2025-08-22T09:35:01.071Z",
+      "updateDate": "2025-08-25T03:17:57.629Z",
       "status": "published",
       "views": 0,
       "likes": 0,
@@ -73,7 +99,7 @@
       ],
       "author": "admin",
       "publishDate": "2024-01-20T00:00:00.000Z",
-      "updateDate": "2025-08-22T09:35:01.075Z",
+      "updateDate": "2025-08-25T03:17:57.635Z",
       "status": "published",
       "views": 0,
       "likes": 0,
@@ -100,7 +126,7 @@
       ],
       "author": "admin",
       "publishDate": "2024-01-15T00:00:00.000Z",
-      "updateDate": "2025-08-22T09:35:01.073Z",
+      "updateDate": "2025-08-25T03:17:57.634Z",
       "status": "published",
       "views": 0,
       "likes": 0,
@@ -127,7 +153,7 @@
       ],
       "author": "admin",
       "publishDate": "2024-01-08T00:00:00.000Z",
-      "updateDate": "2025-08-22T09:35:01.069Z",
+      "updateDate": "2025-08-25T03:17:57.612Z",
       "status": "published",
       "views": 0,
       "likes": 0,
@@ -137,10 +163,10 @@
     }
   ],
   "metadata": {
-    "totalArticles": 5,
-    "publishedArticles": 5,
+    "totalArticles": 6,
+    "publishedArticles": 6,
     "draftArticles": 0,
-    "lastUpdated": "2025-08-22T09:35:01.075Z",
+    "lastUpdated": "2025-08-25T03:17:57.636Z",
     "version": "1.0.0",
     "generatedBy": "generate-article-index.js"
   }
