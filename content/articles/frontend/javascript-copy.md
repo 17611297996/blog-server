@@ -1,7 +1,7 @@
 # JavaScript 中的数据拷贝指南 🧭
 
 > 发布时间：2025-08-24  
-> 分类：前端开发 > JavaScript.js  
+> 分类：前端开发 > JavaScript
 > 标签：JavaScript, 数据拷贝, 前端开发
 
 ## 引言
