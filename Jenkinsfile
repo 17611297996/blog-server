@@ -3,13 +3,9 @@ pipeline {
     tools { nodejs 'NodeJS_22.2' }
 
     environment {
-        // 直接复用前端的 SSH 配置（同一台服务器）
-        SSH_SERVER = 'web-server'  
-        
-        // ⚠️ 后端专用目录，确保和前端目录不同！
-        REMOTE_DIR = '/www/wwwroot/blog_server'  
-        
-        PKG_NAME = 'blog_server'
+        SSH_SERVER = 'web-server'            // 复用前端的配置
+        REMOTE_DIR = '/www/wwwroot/egg-backend'
+        PKG_NAME = 'egg-backend'
     }
 
     stages {
@@ -18,7 +14,7 @@ pipeline {
         }
         stage('安装依赖') {
             steps {
-                sh 'npm install --registry=https://registry.npmmirror.com'
+                sh 'npm install --registry=https://registry.npmmirror.com --fetch-retries=5'
             }
         }
         stage('打包传输') {
@@ -31,8 +27,7 @@ pipeline {
                             transfers: [
                                 sshTransfer(
                                     sourceFiles: "${PKG_NAME}.tar.gz",
-                                    // 因为全局 Remote Directory 为空，这里必须写完整绝对路径
-                                    remoteDirectory: "${REMOTE_DIR}",  
+                                    remoteDirectory: "${REMOTE_DIR}",
                                     execCommand: """
                                         cd ${REMOTE_DIR}
                                         tar -xzf ${PKG_NAME}.tar.gz
@@ -50,5 +45,9 @@ pipeline {
             }
         }
     }
-    post { always { cleanWs() } }
+    post {
+        always {
+            deleteDir()   // 代替 cleanWs()
+        }
+    }
 }
