@@ -7,7 +7,7 @@ pipeline {
         SSH_SERVER = 'web-server'  
         
         // ⚠️ 后端专用目录，确保和前端目录不同！
-        REMOTE_DIR = '/www/wwwroot//www/wwwroot/blog_server'  
+        REMOTE_DIR = '/www/wwwroot/blog_server'  
         
         PKG_NAME = 'blog_server'
     }
