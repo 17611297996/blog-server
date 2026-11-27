@@ -14,7 +14,7 @@ module.exports = appInfo => {
     credentials: true,
   };
 
-  // 静态文件
+  // 静态文件---
   config.static = {
     prefix: '/public/',
     dir: [
