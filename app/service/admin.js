@@ -3,6 +3,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
 const articleModule = require('./article');
+const { makeExcerpt, stripHtml } = require('../lib/excerpt');
 
 class AdminService extends Service {
 
@@ -85,7 +86,7 @@ class AdminService extends Service {
             id: a.id,
             title: a.title,
             slug: a.slug,
-            excerpt: a.excerpt,
+            excerpt: stripHtml(a.excerpt),
             categorySlug: a.categorySlug,
             tags: a.tags,
             status: a.status,
@@ -101,7 +102,8 @@ class AdminService extends Service {
 
     async getArticleById(id) {
         const { articles } = await this.readArticlesData();
-        return articles.find(a => a.id == id) || null;
+        const article = articles.find(a => a.id == id);
+        return article ? { ...article, excerptCustom: this._isCustomExcerpt(article) } : null;
     }
 
     async createArticle({ title, content, excerpt, categorySlug, categorySlugs, tags, status, featured, coverImage }) {
@@ -115,11 +117,13 @@ class AdminService extends Service {
         const allCats = this._flatCategories(catData.categories);
         const cat = allCats.find(c => c.slug === categorySlug);
 
+        const customExcerpt = String(excerpt || '').trim();
         const article = {
             id,
             title,
             slug,
-            excerpt: excerpt || content.substring(0, 150).replace(/[#*`>\n]/g, '').trim() + '...',
+            excerpt: customExcerpt || makeExcerpt(content),
+            excerptCustom: !!customExcerpt,
             content,
             categoryId: cat?.id || 0,
             categorySlug: categorySlug || '',
@@ -150,10 +154,17 @@ class AdminService extends Service {
         const old = data.articles[idx];
         const now = new Date().toISOString();
 
-        // 自动更新摘要
-        if (fields.content && !fields.excerpt) {
-            fields.excerpt = fields.content.substring(0, 150).replace(/[#*`>\n]/g, '').trim() + '...';
+        // 摘要：用户填写的原样保留；留空、或把自动摘要原样发回来时，按最新正文重新生成
+        const content = fields.content !== undefined ? fields.content : old.content;
+        const oldCustom = this._isCustomExcerpt(old);
+        let custom = oldCustom;
+        if (fields.excerpt !== undefined) {
+            const incoming = String(fields.excerpt || '').trim();
+            custom = !!incoming && (oldCustom || incoming !== old.excerpt);
+            if (custom) fields.excerpt = incoming;
         }
+        if (!custom) fields.excerpt = makeExcerpt(content);
+        fields.excerptCustom = custom;
 
         const updated = { ...old, ...fields, updateDate: now };
         data.articles[idx] = updated;
@@ -188,6 +199,13 @@ class AdminService extends Service {
         const dir = path.join(this.app.baseDir, 'content/articles', categorySlug || 'uncategorized');
         await fs.mkdir(dir, { recursive: true });
         await fs.writeFile(path.join(dir, `${slug}.md`), content, 'utf-8');
+    }
+
+    // 旧数据没有 excerptCustom 字段：摘要与旧版自动截取结果一致的，视为自动摘要
+    _isCustomExcerpt(article) {
+        if (typeof article.excerptCustom === 'boolean') return article.excerptCustom;
+        const legacyAuto = String(article.content || '').substring(0, 150).replace(/[#*`>\n]/g, '').trim() + '...';
+        return !!article.excerpt && article.excerpt !== legacyAuto;
     }
 
     _flatCategories(categories) {

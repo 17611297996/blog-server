@@ -1,6 +1,7 @@
 const { Service } = require('egg');
 const fs = require('fs').promises;
 const path = require('path');
+const { stripHtml } = require('../lib/excerpt');
 
 // 进程级内存缓存
 let _cache = null;
@@ -47,7 +48,7 @@ class ArticleService extends Service {
             id: a.id,
             title: a.title,
             slug: a.slug,
-            excerpt: a.excerpt,
+            excerpt: stripHtml(a.excerpt),
             categoryId: a.categoryId,
             categorySlug: a.categorySlug,
             categorySlugs: a.categorySlugs,
