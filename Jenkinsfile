@@ -20,6 +20,9 @@ pipeline {
 
         stage('同步代码到服务器') {
             steps {
+                // 代码目录与仓库保持一致；/mock/（文章、分类数据）和 /content/（.md 文件、上传的图片）由线上后台写入，
+                // 被排除后 --delete 不会删除或覆盖它们
+
                 sh """
                     rsync -avz --delete \
                         --exclude='node_modules' \
@@ -28,7 +31,16 @@ pipeline {
                         --exclude='run' \
                         --exclude='.env' \
                         --exclude='.DS_Store' \
+                        --exclude='/mock/' \
+                        --exclude='/content/' \
                         ./ ${TARGET_USER}@${TARGET_HOST}:${REMOTE_DIR}/
+                """
+                // 数据目录只补齐服务器上没有的文件（首次部署、或仓库里新增的文件），已存在的一律不覆盖，也不删除
+                sh """
+                    rsync -avz --ignore-existing \
+                        --exclude='.DS_Store' \
+                        --exclude='/content/assets/tmp/' \
+                        ./mock ./content ${TARGET_USER}@${TARGET_HOST}:${REMOTE_DIR}/
                 """
             }
         }

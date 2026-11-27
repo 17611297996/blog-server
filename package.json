@@ -7,9 +7,12 @@
     "declarations": true
   },
   "dependencies": {
+    "dayjs": "^1.11.23",
     "egg": "^3.17.5",
     "egg-cors": "^3.0.1",
-    "egg-scripts": "2"
+    "egg-multipart": "^3.5.0",
+    "egg-scripts": "2",
+    "slugify": "^1.6.9"
   },
   "devDependencies": {
     "egg-bin": "6",

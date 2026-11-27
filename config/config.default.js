@@ -1,54 +1,54 @@
 /* eslint valid-jsdoc: "off" */
-
 const path = require('path');
 
-/**
- * @param {Egg.EggAppInfo} appInfo app info
- */
 module.exports = appInfo => {
-  /**
-   * built-in config
-   * @type {Egg.EggAppConfig}
-   **/
   const config = exports = {};
 
-  // use for cookie sign key, should change to your own and keep security
   config.keys = appInfo.name + '_1753019796624_141';
-
-  // add your middleware config here
   config.middleware = [];
 
-  // add your user config here
-  const userConfig = {
-    // myAppName: 'egg',
-  };
-
-  // CORS配置，允许前端跨域访问
+  // CORS
   config.cors = {
-    origin: '*', // 允许来自http://localhost:3000的跨域请求
+    origin: '*',
     allowMethods: 'GET,HEAD,PUT,POST,DELETE,PATCH',
-    credentials: true, // 允许携带cookie
+    credentials: true,
   };
 
-  // 静态文件服务配置 - 支持多个静态目录
+  // 静态文件
   config.static = {
     prefix: '/public/',
     dir: [
       path.join(appInfo.baseDir, 'app/public'),
-      {
-        prefix: '/content/',
-        dir: path.join(appInfo.baseDir, 'content')
-      }
+      { prefix: '/content/', dir: path.join(appInfo.baseDir, 'content') },
     ],
-    dynamic: true, // 如果当前访问的静态资源没有缓存，则缓存静态文件
+    dynamic: true,
     preload: false,
-    maxAge: 31536000, // 1年缓存
-    buffer: true, // 是否缓存文件内容
+    maxAge: 31536000,
+    buffer: true,
     gzip: true,
   };
 
-  return {
-    ...config,
-    ...userConfig,
+  // 图片上传
+  config.multipart = {
+    mode: 'file',
+    fileSize: '10mb',
+    whitelist: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'],
+    tmpdir: path.join(appInfo.baseDir, 'content/assets/tmp'),
+    cleanSchedule: { cron: '0 30 4 * * *' },
   };
+
+  // 关闭 csrf（前后端分离）
+  config.security = {
+    csrf: { enable: false },
+  };
+
+  // admin 配置（密码 + token 过期时间）
+  const userConfig = {
+    admin: {
+      password: 'admin123',   // 上线前改掉
+      tokenExpire: 86400000,  // 24小时，ms
+    },
+  };
+
+  return { ...config, ...userConfig };
 };
