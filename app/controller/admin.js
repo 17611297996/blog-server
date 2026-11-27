@@ -13,7 +13,7 @@ class AdminController extends Controller {
             ctx.body = { success: false, code: 401, message: '密码错误' };
             return;
         }
-        const token = createToken(app.config.admin.tokenExpire);
+        const token = createToken(app);
         ctx.body = { success: true, code: 200, message: '登录成功', data: { token } };
     }
 
