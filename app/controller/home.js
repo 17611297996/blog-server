@@ -1,10 +1,9 @@
 const { Controller } = require('egg');
 
 class HomeController extends Controller {
-  async index() {
-    const { ctx } = this;
-    ctx.body = 'hi, egg';
-  }
+    async index() {
+        this.ctx.body = { name: 'blog-server', status: 'running' };
+    }
 }
 
 module.exports = HomeController;

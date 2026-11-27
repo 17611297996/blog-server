@@ -2,112 +2,70 @@ const { Service } = require('egg');
 const fs = require('fs').promises;
 const path = require('path');
 
+let _cache = null;
+
 class CategoryService extends Service {
-    /**
-     * 获取所有分类数据
-     */
     async getCategoriesData() {
+        if (_cache) return _cache;
         try {
-            const categoriesPath = path.join(this.app.baseDir, 'mock/categories.json');
-            const data = await fs.readFile(categoriesPath, 'utf-8');
-            return JSON.parse(data);
+            const filePath = path.join(this.app.baseDir, 'mock/categories.json');
+            const data = await fs.readFile(filePath, 'utf-8');
+            _cache = JSON.parse(data);
+            return _cache;
         } catch (error) {
             this.logger.error('Failed to read categories data:', error);
-            return { categories: [], metadata: {} };
+            return { categories: [] };
         }
     }
 
-    /**
-     * 获取所有分类列表
-     */
-    async getAllCategories() {
-        const { categories } = await this.getCategoriesData();
-        return categories;
-    }
-
-    /**
-     * 根据ID获取分类
-     * @param {number} id - 分类ID
-     */
     async getCategoryById(id) {
         const { categories } = await this.getCategoriesData();
-        return categories.find(category => category.id == id);
-    }
-
-    /**
-     * 根据slug获取分类（递归查找所有层级）
-     * @param {string} slug - 分类slug
-     */
-    async getCategoryBySlug(slug) {
-        const { categories } = await this.getCategoriesData();
-        function findInTree(list) {
-            for (const cat of list) {
-                if (cat.slug === slug) return cat;
-                if (cat.subCategories) {
-                    const found = findInTree(cat.subCategories);
-                    if (found) return found;
-                }
+        const findById = (list) => {
+            for (const c of list) {
+                if (c.id == id) return c;
+                if (c.subCategories) { const r = findById(c.subCategories); if (r) return r; }
             }
             return null;
-        }
-        return findInTree(categories);
+        };
+        return findById(categories);
     }
 
-    /**
-     * 获取分类树结构（用于导航菜单）
-     */
+    async getCategoryBySlug(slug) {
+        const { categories } = await this.getCategoriesData();
+        const find = (list) => {
+            for (const c of list) {
+                if (c.slug === slug) return c;
+                if (c.subCategories) { const r = find(c.subCategories); if (r) return r; }
+            }
+            return null;
+        };
+        return find(categories);
+    }
+
     async getCategoryTree() {
         const { categories } = await this.getCategoriesData();
-
-        // 构建树形结构
-        return categories.map(category => ({
-            id: category.id,
-            name: category.name,
-            slug: category.slug,
-            description: category.description,
-            hasSubMenu: category.hasSubMenu,
-            subCategories: category.subCategories || []
-        }));
-    }
-
-    /**
-     * 获取主分类（用于前端导航）
-     */
-    async getMainCategories() {
-        const { categories } = await this.getCategoriesData();
-        return categories.filter(category => !category.parentId);
-    }
-
-    /**
-     * 获取子分类
-     * @param {number} parentId - 父分类ID
-     */
-    async getSubCategories(parentId) {
-        const { categories } = await this.getCategoriesData();
-        const parentCategory = categories.find(cat => cat.id == parentId);
-        return parentCategory ? parentCategory.subCategories || [] : [];
-    }
-
-    /**
-     * 获取分类统计信息
-     */
-    async getCategoryStats() {
-        const { categories } = await this.getCategoriesData();
         const { articles } = await this.service.article.getArticlesData();
+        const published = articles.filter(a => a.status === 'published');
 
-        return categories.map(category => {
-            const categoryArticles = articles.filter(article =>
-                article.categoryId === category.id && article.status === 'published'
-            );
+        const countForSlug = (slug) =>
+            published.filter(a => a.categorySlugs && a.categorySlugs.includes(slug)).length;
 
-            return {
-                ...category,
-                articleCount: categoryArticles.length,
-                latestArticle: categoryArticles.length > 0 ?
-                    categoryArticles.sort((a, b) => new Date(b.publishDate) - new Date(a.publishDate))[0] : null
-            };
-        });
+        return categories.map(c => ({
+            id: c.id,
+            name: c.name,
+            slug: c.slug,
+            description: c.description,
+            articleCount: countForSlug(c.slug),
+            hasSubMenu: !!(c.subCategories && c.subCategories.length),
+            subCategories: (c.subCategories || []).map(s => ({
+                id: s.id,
+                name: s.name,
+                slug: s.slug,
+                description: s.description,
+                articleCount: countForSlug(s.slug),
+            })),
+        }));
     }
 }
 
-module.exports = CategoryService; 
+module.exports = CategoryService;

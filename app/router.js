@@ -1,113 +1,40 @@
-/**
- * @param {Egg.Application} app - egg application
- */
 module.exports = app => {
-  const { router, controller } = app;
+    const { router, controller, middleware } = app;
+    const auth = middleware.auth();
 
-  // 首页
-  router.get('/', controller.home.index);
+    // ===== 前台只读接口 =====
+    router.get('/', controller.home.index);
+    router.get('/api/articles', controller.article.index);
+    router.get('/api/articles/search', controller.article.search);
+    router.get('/api/articles/:id', controller.article.show);
+    router.get('/api/categories/tree', controller.category.tree);
+    router.get('/api/tags/cloud', controller.tag.cloud);
+    router.get('/api/stats', controller.stats.index);
 
-  // ========== 文章相关路由 ==========
+    // ===== 后台接口 =====
+    // 登录（无需 auth）
+    router.post('/api/admin/login', controller.admin.login);
 
-  // 获取文章列表（支持分页、搜索、筛选）
-  router.get('/api/articles', controller.article.index);
+    // 以下全部需要 auth
+    router.get('/api/admin/dashboard', auth, controller.admin.dashboard);
 
-  // 搜索文章
-  router.get('/api/articles/search', controller.article.search);
+    // 文章管理
+    router.get('/api/admin/articles', auth, controller.admin.articleList);
+    router.get('/api/admin/articles/:id', auth, controller.admin.articleDetail);
+    router.post('/api/admin/articles', auth, controller.admin.articleCreate);
+    router.put('/api/admin/articles/:id', auth, controller.admin.articleUpdate);
+    router.del('/api/admin/articles/:id', auth, controller.admin.articleDelete);
+    router.patch('/api/admin/articles/:id/status', auth, controller.admin.articleStatus);
 
-  // 获取热门文章
-  router.get('/api/articles/popular', controller.article.popular);
+    // 分类管理
+    router.get('/api/admin/categories', auth, controller.admin.categoryList);
+    router.post('/api/admin/categories', auth, controller.admin.categoryCreate);
+    router.put('/api/admin/categories/:id', auth, controller.admin.categoryUpdate);
+    router.del('/api/admin/categories/:id', auth, controller.admin.categoryDelete);
 
-  // 获取推荐文章
-  router.get('/api/articles/featured', controller.article.featured);
-
-  // 获取最新文章
-  router.get('/api/articles/latest', controller.article.latest);
-
-  // 根据slug获取文章详情
-  router.get('/api/articles/slug/:slug', controller.article.showBySlug);
-
-  // 获取文章原始内容（专用于大文件）
-  router.get('/api/articles/:id/content', controller.article.getContent);
-
-  // 获取文章内容信息（性能分析）
-  router.get('/api/articles/:id/info', controller.article.getContentInfo);
-
-  // 按分类获取文章
-  router.get('/api/articles/category/:categorySlug', controller.article.getByCategory);
-
-  // 按标签获取文章
-  router.get('/api/articles/tag/:tagSlug', controller.article.getByTag);
-
-  // 根据ID获取文章详情（需要放在最后，避免与其他路由冲突）
-  router.get('/api/articles/:id', controller.article.show);
-
-  // ========== 分类相关路由 ==========
-
-  // 获取分类树结构（用于导航菜单）
-  router.get('/api/categories/tree', controller.category.tree);
-
-  // 获取分类统计信息
-  router.get('/api/categories/stats', controller.category.stats);
-
-  // 获取主分类列表
-  router.get('/api/categories/main', controller.category.main);
-
-  // 根据slug获取分类详情
-  router.get('/api/categories/slug/:slug', controller.category.showBySlug);
-
-  // 获取子分类列表
-  router.get('/api/categories/:id/children', controller.category.children);
-
-  // 获取所有分类列表
-  router.get('/api/categories', controller.category.index);
-
-  // 根据ID获取分类详情
-  router.get('/api/categories/:id', controller.category.show);
-
-  // ========== 标签相关路由 ==========
-
-  // 获取热门标签
-  router.get('/api/tags/popular', controller.tag.popular);
-
-  // 获取标签云数据
-  router.get('/api/tags/cloud', controller.tag.cloud);
-
-  // 搜索标签
-  router.get('/api/tags/search', controller.tag.search);
-
-  // 获取标签统计信息
-  router.get('/api/tags/stats', controller.tag.stats);
-
-  // 根据slug获取标签详情
-  router.get('/api/tags/slug/:slug', controller.tag.showBySlug);
-
-  // 获取相关标签
-  router.get('/api/tags/:slug/related', controller.tag.related);
-
-  // 获取所有标签列表
-  router.get('/api/tags', controller.tag.index);
-
-  // 根据ID获取标签详情
-  router.get('/api/tags/:id', controller.tag.show);
-
-  // ========== 用户相关路由 ==========
-
-  // 获取所有作者列表
-  router.get('/api/users/authors', controller.user.getAllAuthors);
-
-  // 根据用户名获取用户信息
-  router.get('/api/users/username/:username', controller.user.showByUsername);
-
-  // 获取作者信息（包含文章统计）
-  router.get('/api/users/author/:identifier', controller.user.getAuthorInfo);
-
-  // 获取用户文章统计
-  router.get('/api/users/:id/stats', controller.user.getArticleStats);
-
-  // 根据ID获取用户信息
-  router.get('/api/users/:id', controller.user.show);
-
-
-
+    // 图片管理
+    router.post('/api/admin/upload', auth, controller.admin.imageUpload);
+    router.get('/api/admin/images', auth, controller.admin.imageList);
+    router.del('/api/admin/images/:filename', auth, controller.admin.imageDelete);
+    router.post('/api/admin/images/cleanup', auth, controller.admin.imageCleanup);
 };
